@@ -50,7 +50,8 @@ services:
     container_name: wpc-monitoring-api
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-monitoring}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-monitoring}
+      DATABASE_URL: >-
+        postgresql+asyncpg://${POSTGRES_USER:-monitoring}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-monitoring}
       INFLUXDB_URL: http://influxdb:8086
       INFLUXDB_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
       INFLUXDB_ORG: ${INFLUXDB_ORG:-wolfpackcloud}
@@ -133,7 +134,8 @@ services:
     command: >
       bash -c "
         superset db upgrade &&
-        superset fab create-admin --username admin --firstname Admin --lastname User --email admin@localhost --password admin || true &&
+        superset fab create-admin --username admin --firstname Admin
+          --lastname User --email admin@localhost --password admin || true &&
         superset init &&
         gunicorn --bind 0.0.0.0:8088 --workers 2 --timeout 60 'superset.app:create_app()'
       "

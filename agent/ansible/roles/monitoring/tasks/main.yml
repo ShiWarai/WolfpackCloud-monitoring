@@ -37,7 +37,9 @@
 
 - name: Добавление репозитория InfluxData (Debian/Ubuntu)
   ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg] https://repos.influxdata.com/debian stable main"
+    repo: >-
+      deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg]
+      https://repos.influxdata.com/debian stable main
     state: present
     filename: influxdata
   when: ansible_os_family == 'Debian'
@@ -55,7 +57,9 @@
 # Генерация кода привязки
 - name: Генерация 8-значного кода привязки
   ansible.builtin.set_fact:
-    pair_code: "{{ lookup('community.general.random_string', length=8, upper=true, numbers=true, special=false, override_all='ABCDEFGHJKLMNPQRSTUVWXYZ23456789') }}"
+    pair_code: >-
+      {{ lookup('community.general.random_string', length=8, upper=true,
+      numbers=true, special=false, override_all='ABCDEFGHJKLMNPQRSTUVWXYZ23456789') }}
   tags:
     - configure
 
@@ -64,9 +68,9 @@
     msg: |
       ╔══════════════════════════════════════════════════════════════════╗
       ║   Код привязки для {{ ansible_hostname }}:
-      ║   
+      ║
       ║              {{ pair_code }}
-      ║   
+      ║
       ║   Введите этот код в панели мониторинга для активации.
       ╚══════════════════════════════════════════════════════════════════╝
   tags:
@@ -152,9 +156,9 @@
     msg: |
       ╔══════════════════════════════════════════════════════════════════╗
       ║   Установка завершена для {{ ansible_hostname }}
-      ║   
+      ║
       ║   Код привязки: {{ pair_code }}
-      ║   
+      ║
       ║   Следующие шаги:
       ║   1. Откройте панель Grafana: {{ monitoring_server_url }}
       ║   2. Перейдите в Dashboard → "Роботы"

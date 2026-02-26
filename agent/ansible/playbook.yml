@@ -22,7 +22,7 @@
   vars:
     # URL сервера мониторинга (обязательно переопределить!)
     monitoring_server_url: "{{ server_url | default('http://localhost:8000') }}"
-    
+
     # Имя робота (по умолчанию - hostname)
     robot_name: "{{ custom_name | default(ansible_hostname) }}"
 
