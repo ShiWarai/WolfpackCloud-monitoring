@@ -115,9 +115,7 @@ async def get_pair_code_info(
 ) -> PairCodeInfoResponse:
     """Получает информацию о коде привязки."""
     result = await db.execute(
-        select(PairCode)
-        .options(selectinload(PairCode.robot))
-        .where(PairCode.code == code.upper())
+        select(PairCode).options(selectinload(PairCode.robot)).where(PairCode.code == code.upper())
     )
     pair_code = result.scalar_one_or_none()
 
@@ -128,10 +126,7 @@ async def get_pair_code_info(
         )
 
     # Проверяем истечение срока
-    if (
-        pair_code.status == PairCodeStatus.PENDING
-        and pair_code.expires_at < datetime.now(UTC)
-    ):
+    if pair_code.status == PairCodeStatus.PENDING and pair_code.expires_at < datetime.now(UTC):
         pair_code.status = PairCodeStatus.EXPIRED
         await db.commit()
 
@@ -163,9 +158,7 @@ async def confirm_pairing(
     - Код привязки помечается как CONFIRMED
     """
     result = await db.execute(
-        select(PairCode)
-        .options(selectinload(PairCode.robot))
-        .where(PairCode.code == code.upper())
+        select(PairCode).options(selectinload(PairCode.robot)).where(PairCode.code == code.upper())
     )
     pair_code = result.scalar_one_or_none()
 

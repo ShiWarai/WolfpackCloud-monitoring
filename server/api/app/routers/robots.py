@@ -30,7 +30,9 @@ router = APIRouter(prefix="/api/robots", tags=["robots"])
     description="Получение списка всех зарегистрированных роботов с пагинацией и фильтрацией.",
 )
 async def list_robots(
-    status_filter: RobotStatus | None = Query(None, alias="status", description="Фильтр по статусу"),
+    status_filter: RobotStatus | None = Query(
+        None, alias="status", description="Фильтр по статусу"
+    ),
     search: str | None = Query(None, description="Поиск по имени или hostname"),
     skip: int = Query(0, ge=0, description="Пропустить записей"),
     limit: int = Query(50, ge=1, le=100, description="Максимум записей"),
