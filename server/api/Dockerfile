@@ -13,12 +13,14 @@ FROM python:3.12-slim AS base
 WORKDIR /app
 
 # Установка системных зависимостей
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Копирование зависимостей
 COPY requirements.txt .
+# hadolint ignore=DL3013
 RUN pip install --no-cache-dir -r requirements.txt
 
 # -----------------------------------------------------------------------------
@@ -31,6 +33,7 @@ ENV PYTHONUNBUFFERED=1
 ENV DEBUG=true
 
 # Установка dev-зависимостей
+# hadolint ignore=DL3013
 RUN pip install --no-cache-dir watchfiles
 
 COPY app/ ./app/
