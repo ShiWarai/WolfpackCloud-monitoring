@@ -72,6 +72,7 @@ detect_arch() {
 # Определение дистрибутива
 detect_distro() {
     if [ -f /etc/os-release ]; then
+        # shellcheck source=/dev/null
         . /etc/os-release
         echo "$ID"
     elif [ -f /etc/debian_version ]; then
