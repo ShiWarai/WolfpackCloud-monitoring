@@ -1,0 +1,15 @@
+# Конфигурация автоматической загрузки дашбордов
+
+apiVersion: 1
+
+providers:
+  - name: 'WolfpackCloud Monitoring'
+    orgId: 1
+    folder: 'Мониторинг роботов'
+    folderUid: 'wolfpack-monitoring'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

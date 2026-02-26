@@ -1,0 +1,35 @@
+# Конфигурация источников данных Grafana
+# Автоматическое подключение к InfluxDB и PostgreSQL
+
+apiVersion: 1
+
+datasources:
+  # InfluxDB — метрики и логи роботов
+  - name: InfluxDB
+    type: influxdb
+    access: proxy
+    url: ${INFLUXDB_URL}
+    jsonData:
+      version: Flux
+      organization: ${INFLUXDB_ORG}
+      defaultBucket: ${INFLUXDB_BUCKET}
+      tlsSkipVerify: true
+    secureJsonData:
+      token: ${INFLUXDB_TOKEN}
+    isDefault: true
+    editable: false
+
+  # PostgreSQL — реестр роботов и метаданные
+  - name: PostgreSQL
+    type: postgres
+    url: ${POSTGRES_HOST}:${POSTGRES_PORT}
+    user: ${POSTGRES_USER}
+    jsonData:
+      database: ${POSTGRES_DB}
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+    editable: false

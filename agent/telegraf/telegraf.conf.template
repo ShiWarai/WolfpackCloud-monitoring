@@ -1,0 +1,174 @@
+# Шаблон конфигурации Telegraf для WolfpackCloud Monitoring
+# Этот файл используется скриптом install.sh для генерации конфигурации
+#
+# Переменные (заменяются при установке):
+#   {{ROBOT_NAME}}      - Имя робота
+#   {{HOSTNAME}}        - Hostname устройства
+#   {{ARCH}}            - Архитектура (arm64/amd64)
+#   {{INFLUX_URL}}      - URL InfluxDB сервера
+#   {{INFLUX_TOKEN}}    - Токен авторизации InfluxDB
+#   {{INFLUX_ORG}}      - Организация InfluxDB
+#   {{INFLUX_BUCKET}}   - Bucket InfluxDB
+
+[global_tags]
+  robot = "{{ROBOT_NAME}}"
+  hostname = "{{HOSTNAME}}"
+  arch = "{{ARCH}}"
+
+[agent]
+  # Интервал сбора метрик
+  interval = "10s"
+  
+  # Округление времени сбора
+  round_interval = true
+  
+  # Размер батча для отправки
+  metric_batch_size = 1000
+  
+  # Максимальный буфер метрик в памяти
+  metric_buffer_limit = 10000
+  
+  # Джиттер для распределения нагрузки
+  collection_jitter = "0s"
+  
+  # Интервал отправки метрик
+  flush_interval = "10s"
+  flush_jitter = "0s"
+  
+  # Точность временных меток
+  precision = "0s"
+  
+  # Использовать глобальный hostname
+  hostname = ""
+  omit_hostname = false
+  
+  # Режим отладки
+  debug = false
+  quiet = false
+
+###############################################################################
+#                            OUTPUT PLUGINS                                   #
+###############################################################################
+
+# Отправка в InfluxDB 2.x
+[[outputs.influxdb_v2]]
+  urls = ["{{INFLUX_URL}}"]
+  token = "{{INFLUX_TOKEN}}"
+  organization = "{{INFLUX_ORG}}"
+  bucket = "{{INFLUX_BUCKET}}"
+  
+  # Таймаут соединения
+  timeout = "5s"
+  
+  # Сжатие данных
+  content_encoding = "gzip"
+
+###############################################################################
+#                            INPUT PLUGINS                                    #
+###############################################################################
+
+# ====================== СИСТЕМНЫЕ МЕТРИКИ ======================
+
+# CPU - загрузка процессора
+[[inputs.cpu]]
+  # Сбор метрик по каждому ядру
+  percpu = true
+  # Сбор общих метрик CPU
+  totalcpu = true
+  # Не собирать cpu_time (экономит место)
+  collect_cpu_time = false
+  # Репорт активного использования
+  report_active = false
+  # Игнорировать гостевые метрики
+  core_tags = false
+
+# Память - RAM и использование
+[[inputs.mem]]
+
+# Swap - файл/раздел подкачки
+[[inputs.swap]]
+
+# Диск - использование разделов
+[[inputs.disk]]
+  # Игнорировать виртуальные и временные ФС
+  ignore_fs = [
+    "tmpfs", "devtmpfs", "devfs", "iso9660",
+    "overlay", "aufs", "squashfs", "nsfs",
+    "fuse.snapfuse", "fuse.lxcfs"
+  ]
+  # Точки монтирования для мониторинга (пусто = все)
+  # mount_points = ["/", "/home", "/data"]
+
+# Disk I/O - операции чтения/записи
+[[inputs.diskio]]
+  # Устройства для мониторинга (пусто = все)
+  # devices = ["sda", "nvme0n1", "mmcblk0"]
+
+# Сеть - трафик по интерфейсам
+[[inputs.net]]
+  # Игнорировать статистику протоколов
+  ignore_protocol_stats = true
+  # Интерфейсы для мониторинга (пусто = все)
+  # interfaces = ["eth0", "wlan0"]
+
+# Система - общие метрики
+[[inputs.system]]
+
+# Процессы - количество и состояния
+[[inputs.processes]]
+
+# ====================== МЕТРИКИ ARM SBC ======================
+
+# Температура - критично для одноплатных компьютеров
+[[inputs.temp]]
+
+# Kernel - метрики ядра
+[[inputs.kernel]]
+
+# ====================== ЛОГИ ======================
+
+# Системные логи через syslog
+[[inputs.syslog]]
+  server = "udp://127.0.0.1:6514"
+
+# Логи из файлов
+[[inputs.tail]]
+  files = ["/var/log/syslog", "/var/log/messages", "/var/log/auth.log"]
+  from_beginning = false
+  
+  # Парсинг syslog формата
+  data_format = "grok"
+  grok_patterns = [
+    "%{SYSLOGTIMESTAMP:timestamp} %{SYSLOGHOST:logsource} %{PROG:program}(?:\\[%{POSINT:pid}\\])?: %{GREEDYDATA:message}"
+  ]
+  
+  name_override = "syslog"
+  
+  [inputs.tail.tags]
+    source = "file"
+
+# ====================== ДОПОЛНИТЕЛЬНЫЕ ПЛАГИНЫ ======================
+
+# Внутренние метрики Telegraf (для отладки)
+[[inputs.internal]]
+  collect_memstats = false
+  [inputs.internal.tags]
+    internal = "true"
+
+# Проверка доступности сети (ping к серверу)
+# [[inputs.ping]]
+#   urls = ["{{INFLUX_URL}}"]
+#   count = 1
+#   timeout = 2.0
+#   interval = "60s"
+
+# ====================== ROS 2 МЕТРИКИ (опционально) ======================
+# Раскомментируйте, если на роботе установлен ROS 2
+
+# Exec-плагин для сбора метрик ROS 2
+# [[inputs.exec]]
+#   commands = ["/opt/ros/humble/lib/ros2/ros2_metrics.sh"]
+#   timeout = "5s"
+#   data_format = "influx"
+#   interval = "30s"
+#   name_override = "ros2"

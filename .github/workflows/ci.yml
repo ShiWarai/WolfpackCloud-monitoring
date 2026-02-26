@@ -1,0 +1,197 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ==========================================================================
+  # Линтинг
+  # ==========================================================================
+  lint:
+    name: Линтинг
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Установка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Установка зависимостей
+        run: |
+          pip install ruff
+      
+      - name: Линтинг Python (ruff)
+        run: |
+          ruff check server/api/
+          ruff format --check server/api/
+      
+      - name: Линтинг Dockerfile (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: server/api/Dockerfile
+          failure-threshold: warning
+      
+      - name: Линтинг YAML
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          file_or_dir: |
+            docker-compose.yml
+            docker-compose.dev.yml
+            .github/workflows/
+            agent/ansible/
+          config_file: .yamllint.yml
+        continue-on-error: true
+      
+      - name: Линтинг Shell скриптов
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: './agent'
+          additional_files: 'scripts/local-install.sh scripts/local-uninstall.sh'
+        continue-on-error: true
+
+  # ==========================================================================
+  # Тестирование API
+  # ==========================================================================
+  test-api:
+    name: Тесты API
+    runs-on: ubuntu-latest
+    needs: lint
+    
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: monitoring_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: testpassword
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Установка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Кэширование pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('server/api/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Установка зависимостей
+        run: |
+          pip install -r server/api/requirements.txt
+          pip install pytest-anyio
+      
+      - name: Запуск тестов
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:testpassword@localhost:5432/monitoring_test
+          SECRET_KEY: test-secret-key
+          INFLUXDB_URL: http://localhost:8086
+          INFLUXDB_TOKEN: test-token
+        run: |
+          cd server/api
+          pytest tests/ -v --tb=short
+
+  # ==========================================================================
+  # Сборка Docker образов
+  # ==========================================================================
+  build:
+    name: Сборка образов
+    runs-on: ubuntu-latest
+    needs: [lint, test-api]
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Настройка Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Сборка API образа
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server/api
+          push: false
+          tags: wpc-monitoring-api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Проверка docker-compose
+        run: |
+          cp .env.example .env
+          sed -i 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=testpass/' .env
+          sed -i 's/INFLUXDB_ADMIN_PASSWORD=.*/INFLUXDB_ADMIN_PASSWORD=testpass/' .env
+          sed -i 's/INFLUXDB_ADMIN_TOKEN=.*/INFLUXDB_ADMIN_TOKEN=test-token/' .env
+          sed -i 's/SECRET_KEY=.*/SECRET_KEY=test-secret/' .env
+          sed -i 's/SUPERSET_SECRET_KEY=.*/SUPERSET_SECRET_KEY=test-superset-secret/' .env
+          docker compose config
+
+  # ==========================================================================
+  # Интеграционные тесты
+  # ==========================================================================
+  integration:
+    name: Интеграционные тесты
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Подготовка окружения
+        run: |
+          cp .env.example .env
+          sed -i 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=testpass/' .env
+          sed -i 's/INFLUXDB_ADMIN_PASSWORD=.*/INFLUXDB_ADMIN_PASSWORD=testpass/' .env
+          sed -i 's/INFLUXDB_ADMIN_TOKEN=.*/INFLUXDB_ADMIN_TOKEN=test-token-integration/' .env
+          sed -i 's/SECRET_KEY=.*/SECRET_KEY=test-secret-integration/' .env
+          sed -i 's/SUPERSET_SECRET_KEY=.*/SUPERSET_SECRET_KEY=test-superset-integration/' .env
+      
+      - name: Запуск стека
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres influxdb api
+          
+          # Ожидание готовности
+          sleep 30
+          
+          # Проверка health
+          curl -f http://localhost:8000/health || exit 1
+      
+      - name: Тест API эндпоинтов
+        run: |
+          # Тест регистрации робота
+          response=$(curl -sf -X POST http://localhost:8000/api/pair \
+            -H "Content-Type: application/json" \
+            -d '{"hostname": "test-robot", "pair_code": "TEST1234"}')
+          echo "Response: $response"
+          
+          # Тест списка роботов
+          curl -sf http://localhost:8000/api/robots
+      
+      - name: Остановка стека
+        if: always()
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v

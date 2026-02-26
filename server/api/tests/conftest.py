@@ -1,0 +1,11 @@
+"""
+Конфигурация pytest.
+"""
+
+import pytest
+
+
+@pytest.fixture(scope="session")
+def anyio_backend():
+    """Бэкенд для anyio."""
+    return "asyncio"

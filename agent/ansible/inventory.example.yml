@@ -1,0 +1,72 @@
+---
+# =============================================================================
+# Пример inventory для WolfpackCloud Monitoring
+# =============================================================================
+#
+# Скопируйте этот файл в inventory.yml и настройте под вашу инфраструктуру:
+#   cp inventory.example.yml inventory.yml
+#
+# Использование:
+#   ansible-playbook -i inventory.yml playbook.yml
+#
+
+all:
+  vars:
+    # URL сервера мониторинга (обязательно!)
+    server_url: "https://monitoring.example.com"
+    
+    # SSH пользователь (по умолчанию)
+    ansible_user: ubuntu
+    
+    # Использовать sudo
+    ansible_become: true
+    
+    # Python интерпретатор
+    ansible_python_interpreter: /usr/bin/python3
+
+  children:
+    # Группа всех роботов
+    robots:
+      hosts:
+        # Пример: Raspberry Pi
+        robot-01:
+          ansible_host: 192.168.1.101
+          custom_name: "Робот складской #1"
+        
+        robot-02:
+          ansible_host: 192.168.1.102
+          custom_name: "Робот складской #2"
+        
+        # Пример: OrangePi 5
+        robot-03:
+          ansible_host: 192.168.1.103
+          custom_name: "Робот доставки"
+        
+        # Пример: робот в другой сети (через jump host)
+        # robot-remote:
+        #   ansible_host: 10.0.0.50
+        #   ansible_ssh_common_args: '-o ProxyJump=jumphost.example.com'
+        #   custom_name: "Удалённый робот"
+
+    # Группа роботов по типу (опционально)
+    raspberry_pi:
+      hosts:
+        robot-01:
+        robot-02:
+      vars:
+        # Специфичные настройки для Raspberry Pi
+        telegraf_extra_inputs: |
+          [[inputs.file]]
+            files = ["/sys/class/thermal/thermal_zone0/temp"]
+            data_format = "value"
+            data_type = "integer"
+            name_override = "cpu_temperature"
+            [inputs.file.tags]
+              sensor = "cpu"
+
+    orange_pi:
+      hosts:
+        robot-03:
+      vars:
+        # Специфичные настройки для OrangePi
+        telegraf_extra_inputs: ""
