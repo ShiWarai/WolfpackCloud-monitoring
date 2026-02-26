@@ -48,10 +48,14 @@ class Robot(Base):
     hostname: Mapped[str] = mapped_column(String(255), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     architecture: Mapped[Architecture] = mapped_column(
-        Enum(Architecture), nullable=False, default=Architecture.ARM64
+        Enum(Architecture, name="architecture"),
+        nullable=False,
+        default=Architecture.ARM64,
     )
     status: Mapped[RobotStatus] = mapped_column(
-        Enum(RobotStatus), nullable=False, default=RobotStatus.PENDING
+        Enum(RobotStatus, name="robot_status"),
+        nullable=False,
+        default=RobotStatus.PENDING,
     )
     influxdb_token: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
@@ -80,7 +84,9 @@ class PairCode(Base):
     code: Mapped[str] = mapped_column(String(8), unique=True, nullable=False, index=True)
     robot_id: Mapped[int] = mapped_column(ForeignKey("robots.id"), nullable=False)
     status: Mapped[PairCodeStatus] = mapped_column(
-        Enum(PairCodeStatus), nullable=False, default=PairCodeStatus.PENDING
+        Enum(PairCodeStatus, name="pair_code_status"),
+        nullable=False,
+        default=PairCodeStatus.PENDING,
     )
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
