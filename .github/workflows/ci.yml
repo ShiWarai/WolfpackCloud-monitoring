@@ -165,29 +165,59 @@ jobs:
           cp .env.example .env
           sed -i 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=testpass/' .env
           sed -i 's/INFLUXDB_ADMIN_PASSWORD=.*/INFLUXDB_ADMIN_PASSWORD=testpass/' .env
-          sed -i 's/INFLUXDB_ADMIN_TOKEN=.*/INFLUXDB_ADMIN_TOKEN=test-token-integration/' .env
-          sed -i 's/SECRET_KEY=.*/SECRET_KEY=test-secret-integration/' .env
-          sed -i 's/SUPERSET_SECRET_KEY=.*/SUPERSET_SECRET_KEY=test-superset-integration/' .env
+          sed -i 's/INFLUXDB_ADMIN_TOKEN=.*/INFLUXDB_ADMIN_TOKEN=test-token-integration-32chars/' .env
+          sed -i 's/SECRET_KEY=.*/SECRET_KEY=test-secret-integration-32chars-key/' .env
+          sed -i 's/SUPERSET_SECRET_KEY=.*/SUPERSET_SECRET_KEY=test-superset-integration-32chars/' .env
+          cat .env
 
       - name: Запуск стека
         run: |
           docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres influxdb api
 
-          # Ожидание готовности
-          sleep 30
+          # Ожидание готовности PostgreSQL
+          echo "Ожидание PostgreSQL..."
+          for i in {1..30}; do
+            if docker compose exec -T postgres pg_isready -U monitoring; then
+              echo "PostgreSQL готов"
+              break
+            fi
+            echo "Попытка $i/30..."
+            sleep 2
+          done
 
-          # Проверка health
-          curl -f http://localhost:8000/health || exit 1
+          # Ожидание готовности API
+          echo "Ожидание API..."
+          for i in {1..30}; do
+            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              echo "API готов"
+              break
+            fi
+            echo "Попытка $i/30..."
+            sleep 2
+          done
+
+          # Финальная проверка
+          curl -f http://localhost:8000/health
 
       - name: Тест API эндпоинтов
         run: |
           # Тест регистрации робота
-          response=$(curl -sf -X POST http://localhost:8000/api/pair \
+          echo "Тест регистрации робота..."
+          response=$(curl -s -w "\n%{http_code}" -X POST http://localhost:8000/api/pair \
             -H "Content-Type: application/json" \
             -d '{"hostname": "test-robot", "pair_code": "TEST1234"}')
-          echo "Response: $response"
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n -1)
+          echo "Response: $body"
+          echo "HTTP Code: $http_code"
+          if [ "$http_code" != "201" ]; then
+            echo "Ошибка: ожидался код 201, получен $http_code"
+            docker compose logs api
+            exit 1
+          fi
 
           # Тест списка роботов
+          echo "Тест списка роботов..."
           curl -sf http://localhost:8000/api/robots
 
       - name: Остановка стека
