@@ -176,14 +176,13 @@ fly deploy
 
 ## 4. Собственный сервер
 
-Для staging и production рекомендуется собственный сервер.
+Для production рекомендуется собственный сервер.
 
 ### Требуемые GitHub Secrets:
 
 | Окружение | Секреты |
 |-----------|---------|
 | Development | `DEV_HOST`, `DEV_USER`, `DEV_SSH_KEY` |
-| Staging | `STAGING_HOST`, `STAGING_USER`, `STAGING_SSH_KEY` |
 | Production | `PRODUCTION_HOST`, `PRODUCTION_USER`, `PRODUCTION_SSH_KEY` |
 
 ### Настройка секретов:
@@ -234,12 +233,9 @@ cat ~/.ssh/github-actions
 ### Для разработки (dev ветка):
 - **GitHub Actions** — автоматические тесты при каждом пуше
 - **GitHub Codespaces** — для ручной разработки и отладки
+- Автодеплой на development-сервер (опционально)
 
-### Для staging (main ветка):
-- **Render/Railway** (бесплатно) или **собственный сервер**
-- Автодеплой при мерже в main
-
-### Для production (теги v*):
+### Для production (main ветка или теги v*):
 - **Собственный сервер** с ручным подтверждением деплоя
 - GitHub Environments с required reviewers
 
@@ -250,13 +246,11 @@ feature/* → dev (PR)
     ↓
   CI: lint, test, build
     ↓
+  Deploy: development (авто)
+    ↓
 dev → main (PR)
     ↓
-  Deploy: staging
-    ↓
-v1.0.0 (tag)
-    ↓
-  Deploy: production (manual approval)
+  Deploy: production (авто или manual approval)
 ```
 
 ---
@@ -266,7 +260,7 @@ v1.0.0 (tag)
 Для защиты production:
 
 1. Settings → Environments → New environment
-2. Создайте: `development`, `staging`, `production`
+2. Создайте: `development`, `production`
 3. Для `production`:
    - Required reviewers: добавьте себя
    - Wait timer: 5 минут (опционально)
