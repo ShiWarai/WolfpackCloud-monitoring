@@ -4,27 +4,10 @@
 
 import pytest
 from fastapi import status
-from httpx import ASGITransport, AsyncClient
-
-from app.main import app
+from httpx import AsyncClient
 
 
-@pytest.fixture
-def anyio_backend():
-    return "asyncio"
-
-
-@pytest.fixture
-async def client():
-    """Асинхронный HTTP клиент для тестов."""
-    async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test",
-    ) as ac:
-        yield ac
-
-
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_health_check(client: AsyncClient):
     """Тест health check эндпоинта."""
     response = await client.get("/health")
@@ -34,7 +17,7 @@ async def test_health_check(client: AsyncClient):
     assert "version" in data
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_root(client: AsyncClient):
     """Тест корневого эндпоинта."""
     response = await client.get("/")
@@ -44,7 +27,7 @@ async def test_root(client: AsyncClient):
     assert "version" in data
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_register_robot(client: AsyncClient):
     """Тест регистрации робота."""
     pair_code = "ABCD1234"
@@ -66,7 +49,7 @@ async def test_register_robot(client: AsyncClient):
     assert "expires_at" in data
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_register_robot_duplicate_code(client: AsyncClient):
     """Тест регистрации с дублирующимся кодом."""
     pair_code = "DUPL1234"
@@ -92,7 +75,7 @@ async def test_register_robot_duplicate_code(client: AsyncClient):
     assert response2.status_code == status.HTTP_409_CONFLICT
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_get_pair_code_info(client: AsyncClient):
     """Тест получения информации о коде привязки."""
     pair_code = "INFO1234"
@@ -114,14 +97,14 @@ async def test_get_pair_code_info(client: AsyncClient):
     assert data["status"] == "pending"
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_get_pair_code_not_found(client: AsyncClient):
     """Тест получения несуществующего кода."""
     response = await client.get("/api/pair/NOTFOUND")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_confirm_pairing(client: AsyncClient):
     """Тест подтверждения привязки."""
     pair_code = "CONF1234"
@@ -148,7 +131,7 @@ async def test_confirm_pairing(client: AsyncClient):
     assert data["influxdb_token"] is not None
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_confirm_already_confirmed(client: AsyncClient):
     """Тест повторного подтверждения."""
     pair_code = "DBLC1234"
@@ -170,7 +153,7 @@ async def test_confirm_already_confirmed(client: AsyncClient):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_list_robots(client: AsyncClient):
     """Тест получения списка роботов."""
     response = await client.get("/api/robots")
@@ -181,14 +164,14 @@ async def test_list_robots(client: AsyncClient):
     assert isinstance(data["robots"], list)
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_get_robot_not_found(client: AsyncClient):
     """Тест получения несуществующего робота."""
     response = await client.get("/api/robots/99999")
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 async def test_delete_robot(client: AsyncClient):
     """Тест удаления робота."""
     pair_code = "DELE1234"
