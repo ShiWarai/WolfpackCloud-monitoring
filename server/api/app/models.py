@@ -13,16 +13,16 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
-class RobotStatus(str, enum.Enum):
+class RobotStatus(enum.StrEnum):
     """Статусы робота."""
 
-    PENDING = "pending"  # Ожидает подтверждения привязки
-    ACTIVE = "active"  # Активен, отправляет метрики
-    INACTIVE = "inactive"  # Неактивен (давно не было метрик)
-    ERROR = "error"  # Ошибка
+    PENDING = "pending"
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    ERROR = "error"
 
 
-class Architecture(str, enum.Enum):
+class Architecture(enum.StrEnum):
     """Архитектура процессора."""
 
     ARM64 = "arm64"
@@ -30,12 +30,12 @@ class Architecture(str, enum.Enum):
     ARMHF = "armhf"
 
 
-class PairCodeStatus(str, enum.Enum):
+class PairCodeStatus(enum.StrEnum):
     """Статусы кода привязки."""
 
-    PENDING = "pending"  # Ожидает подтверждения
-    CONFIRMED = "confirmed"  # Подтверждён
-    EXPIRED = "expired"  # Истёк срок действия
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    EXPIRED = "expired"
 
 
 class Robot(Base):

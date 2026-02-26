@@ -8,6 +8,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import Architecture, PairCodeStatus, RobotStatus
 
+__all__ = [
+    "Architecture",
+    "PairCodeStatus",
+    "RobotStatus",
+]
+
 
 # =============================================================================
 # Схемы для роботов

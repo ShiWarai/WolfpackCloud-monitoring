@@ -21,13 +21,12 @@ settings = get_settings()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_app: FastAPI):
     """Lifecycle события приложения."""
     # Startup
     await init_db()
     yield
     # Shutdown
-    pass
 
 
 app = FastAPI(
@@ -70,7 +69,7 @@ app.add_middleware(
 
 # Обработчик исключений
 @app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+async def global_exception_handler(_request: Request, _exc: Exception) -> JSONResponse:
     """Глобальный обработчик исключений."""
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
