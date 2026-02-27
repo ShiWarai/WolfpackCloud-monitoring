@@ -1,26 +1,20 @@
 name: Deploy
 
 on:
-  # Запуск после успешного завершения CI
-  workflow_run:
-    workflows: ["CI"]
-    types:
-      - completed
-    branches: [main, dev]
   # Ручной запуск
   workflow_dispatch:
     inputs:
       environment:
         description: 'Окружение для деплоя'
         required: true
-        default: 'development'
+        default: 'production'
         type: choice
         options:
           - development
           - production
-  # Теги для production или push в main/dev
+  # Публикация образа только при push в main или тегах
   push:
-    branches: [main, dev]
+    branches: [main]
     tags:
       - 'v*'
 
