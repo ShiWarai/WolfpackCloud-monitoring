@@ -18,8 +18,9 @@ on:
         options:
           - development
           - production
-  # Теги для production
+  # Теги для production или push в main/dev
   push:
+    branches: [main, dev]
     tags:
       - 'v*'
 
