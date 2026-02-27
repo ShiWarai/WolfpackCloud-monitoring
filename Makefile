@@ -34,7 +34,7 @@ install: ## Установка зависимостей
 
 dev: ## Запуск dev-окружения
 	@echo "$(BLUE)Запуск dev-окружения...$(NC)"
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) up -d --build
+	docker-compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) up -d --build
 	@echo "$(GREEN)Сервисы запущены:$(NC)"
 	@echo "  Grafana:  http://localhost:3000"
 	@echo "  API:      http://localhost:8000/docs"
@@ -42,20 +42,20 @@ dev: ## Запуск dev-окружения
 
 up: ## Запуск production стека
 	@echo "$(BLUE)Запуск production стека...$(NC)"
-	docker compose -f $(COMPOSE_FILE) up -d
+	docker-compose -f $(COMPOSE_FILE) up -d
 	@echo "$(GREEN)Готово$(NC)"
 
 down: ## Остановка стека
 	@echo "$(BLUE)Остановка стека...$(NC)"
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) down
+	docker-compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) down
 	@echo "$(GREEN)Готово$(NC)"
 
 logs: ## Показать логи
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) logs -f
+	docker-compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) logs -f
 
 restart: ## Перезапуск стека
 	@echo "$(BLUE)Перезапуск стека...$(NC)"
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) restart
+	docker-compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) restart
 	@echo "$(GREEN)Готово$(NC)"
 
 # =============================================================================
@@ -64,7 +64,7 @@ restart: ## Перезапуск стека
 
 build: ## Сборка Docker образов
 	@echo "$(BLUE)Сборка образов...$(NC)"
-	docker compose -f $(COMPOSE_FILE) build
+	docker-compose -f $(COMPOSE_FILE) build
 	@echo "$(GREEN)Готово$(NC)"
 
 build-api: ## Сборка только API образа
@@ -121,13 +121,13 @@ local-uninstall: ## Удаление локальной установки
 # =============================================================================
 
 db-shell: ## Подключение к PostgreSQL
-	docker compose exec postgres psql -U monitoring -d monitoring
+	docker-compose exec postgres psql -U monitoring -d monitoring
 
 db-migrate: ## Применение миграций (если есть)
-	docker compose exec api alembic upgrade head
+	docker-compose exec api alembic upgrade head
 
 influx-shell: ## Подключение к InfluxDB CLI
-	docker compose exec influxdb influx
+	docker-compose exec influxdb influx
 
 # =============================================================================
 # Очистка
@@ -147,7 +147,7 @@ clean: ## Очистка временных файлов
 clean-docker: ## Очистка Docker ресурсов
 	@echo "$(YELLOW)Внимание: это удалит все данные!$(NC)"
 	@read -p "Продолжить? (y/N): " confirm && [ "$$confirm" = "y" ]
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) down -v --rmi local
+	docker-compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) down -v --rmi local
 	docker image prune -f
 	@echo "$(GREEN)Готово$(NC)"
 
@@ -165,7 +165,7 @@ env: ## Создание .env из шаблона
 	fi
 
 ps: ## Статус контейнеров
-	docker compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) ps
+	docker-compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) ps
 
 health: ## Проверка health всех сервисов
 	@echo "$(BLUE)Проверка сервисов...$(NC)"
