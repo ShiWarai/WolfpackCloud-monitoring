@@ -1,6 +1,12 @@
 name: Deploy
 
 on:
+  # Запуск после успешного CI на main
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+    branches: [main]
   # Ручной запуск
   workflow_dispatch:
     inputs:
@@ -12,9 +18,8 @@ on:
         options:
           - development
           - production
-  # Публикация образа только при push в main или тегах
+  # Теги для релизов
   push:
-    branches: [main]
     tags:
       - 'v*'
 
