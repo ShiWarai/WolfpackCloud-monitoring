@@ -142,7 +142,7 @@ jobs:
           cp .env.example .env
           sed -i 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=testpass/' .env
           sed -i 's/INFLUXDB_ADMIN_PASSWORD=.*/INFLUXDB_ADMIN_PASSWORD=testpass/' .env
-          sed -i 's/INFLUXDB_ADMIN_TOKEN=.*/INFLUXDB_ADMIN_TOKEN=test-token/' .env
+          sed -i 's/INFLUXDB_ADMIN_TOKEN=.*/INFLUXDB_ADMIN_TOKEN=test-token-build-stage-32chars/' .env
           sed -i 's/SECRET_KEY=.*/SECRET_KEY=test-secret/' .env
           sed -i 's/SUPERSET_SECRET_KEY=.*/SUPERSET_SECRET_KEY=test-superset-secret/' .env
           docker compose config

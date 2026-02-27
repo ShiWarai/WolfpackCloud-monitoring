@@ -154,7 +154,7 @@ async def delete_robot(
             detail="Робот не найден",
         )
 
-    await db.delete(robot)
+    db.delete(robot)
     await db.commit()
 
 

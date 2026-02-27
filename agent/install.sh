@@ -190,12 +190,11 @@ configure_telegraf() {
         cp "$TELEGRAF_CONF_FILE" "${TELEGRAF_CONF_FILE}.backup.$(date +%Y%m%d%H%M%S)"
     fi
     
-    # Определяем URL для InfluxDB
-    local influx_url="${SERVER_URL}/influxdb"
-    # Если SERVER_URL заканчивается на порт, используем стандартный путь
-    if [[ "$SERVER_URL" =~ :[0-9]+$ ]]; then
-        influx_url="${SERVER_URL%:*}:8086"
-    fi
+    # Определяем URL для InfluxDB (всегда порт 8086)
+    # Удаляем существующий порт (если есть) и добавляем :8086
+    local server_base
+    server_base=$(echo "$SERVER_URL" | sed -E 's|(https?://[^/:]+)(:[0-9]+)?.*|\1|')
+    local influx_url="${server_base}:8086"
     
     # Создаём конфигурацию из шаблона
     cat > "$TELEGRAF_CONF_FILE" << EOF
