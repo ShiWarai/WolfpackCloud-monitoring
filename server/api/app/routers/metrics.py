@@ -46,9 +46,7 @@ async def get_robot_by_token(
             detail="Токен не указан",
         )
 
-    result = await db.execute(
-        select(Robot).where(Robot.influxdb_token == token)
-    )
+    result = await db.execute(select(Robot).where(Robot.influxdb_token == token))
     robot = result.scalar_one_or_none()
 
     if not robot:
