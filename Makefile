@@ -2,7 +2,7 @@
 # WolfpackCloud Monitoring — Makefile
 # =============================================================================
 
-.PHONY: help install dev up down logs build test lint clean
+.PHONY: help install dev up down logs build test lint clean clean-data clean-docker
 
 # Переменные
 COMPOSE_FILE := docker-compose.yml
@@ -141,10 +141,22 @@ clean: ## Очистка временных файлов
 	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	find . -type f -name ".coverage" -delete 2>/dev/null || true
-	rm -f .local_pair_code 2>/dev/null || true
+	rm -f .local_pair_code .local_robot_token 2>/dev/null || true
 	@echo "$(GREEN)Готово$(NC)"
 
-clean-docker: ## Очистка Docker ресурсов
+clean-data: ## Очистка всех данных в БД (метрики и роботы)
+	@echo "$(YELLOW)Очистка данных в InfluxDB и PostgreSQL...$(NC)"
+	@docker-compose exec -T influxdb influx delete \
+		--bucket robots \
+		--org wolfpackcloud \
+		--start '1970-01-01T00:00:00Z' \
+		--stop '2030-01-01T00:00:00Z' 2>/dev/null || true
+	@docker-compose exec -T postgres psql -U monitoring -d monitoring -c "TRUNCATE pair_codes, robots RESTART IDENTITY CASCADE;" 2>/dev/null || true
+	@docker rm -f wpc-telegraf-local 2>/dev/null || true
+	@rm -f .local_robot_token 2>/dev/null || true
+	@echo "$(GREEN)Данные очищены$(NC)"
+
+clean-docker: ## Очистка Docker ресурсов (удалит все данные!)
 	@echo "$(YELLOW)Внимание: это удалит все данные!$(NC)"
 	@read -p "Продолжить? (y/N): " confirm && [ "$$confirm" = "y" ]
 	docker-compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) down -v --rmi local
