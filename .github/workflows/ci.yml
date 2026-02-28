@@ -224,3 +224,47 @@ jobs:
         if: always()
         run: |
           docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v
+
+  # ==========================================================================
+  # Уведомления
+  # ==========================================================================
+  notify-telegram-on-success:
+    name: Notify Telegram on success
+    runs-on: ubuntu-latest
+    needs: [lint, test-api, build]
+    if: always() && needs.lint.result == 'success' && needs.test-api.result == 'success' && needs.build.result == 'success'
+
+    steps:
+      - name: Send Telegram notification (silent)
+        uses: appleboy/telegram-action@v1.0.1
+        continue-on-error: true
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: markdown
+          disable_notification: true
+          message: |
+            *CI прошёл успешно*
+            Репо: `${{ github.repository }}`
+            Ветка: `${{ github.ref_name }}`
+            [Открыть run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+  notify-telegram-on-failure:
+    name: Notify Telegram on failure
+    runs-on: ubuntu-latest
+    needs: [lint, test-api, build]
+    if: always() && (needs.lint.result == 'failure' || needs.test-api.result == 'failure' || needs.build.result == 'failure')
+
+    steps:
+      - name: Send Telegram notification
+        uses: appleboy/telegram-action@v1.0.1
+        continue-on-error: true
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          format: markdown
+          message: |
+            *CI упал*
+            Репо: `${{ github.repository }}`
+            Ветка: `${{ github.ref_name }}`
+            [Открыть run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
