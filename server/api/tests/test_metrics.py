@@ -2,6 +2,7 @@
 Тесты для API приёма метрик от роботов.
 """
 
+import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -29,7 +30,7 @@ def mock_influxdb():
 @pytest.fixture
 async def active_robot_token(client: AsyncClient) -> str:
     """Создаёт активного робота и возвращает его токен."""
-    pair_code = "METR1234"
+    pair_code = uuid.uuid4().hex[:8].upper()
 
     await client.post(
         "/api/pair",
