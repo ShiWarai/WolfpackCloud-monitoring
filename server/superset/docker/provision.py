@@ -201,15 +201,15 @@ class SupersetProvisioner:
         return None
 
     def create_dashboard(self, title: str, chart_ids: list[int]) -> int:
-        """Создаём dashboard."""
+        """Создаём или обновляем dashboard."""
         existing_id = self.get_existing_dashboard(title)
         if existing_id:
-            logger.info(f"Dashboard '{title}' already exists (id={existing_id})")
+            logger.info(f"Dashboard '{title}' already exists (id={existing_id}), updating...")
+            self._add_charts_to_dashboard(existing_id, chart_ids)
             return existing_id
 
         logger.info(f"Creating dashboard '{title}'...")
 
-        # Создаём layout для дашборда
         position_json = self._build_dashboard_layout(chart_ids)
 
         resp = self.session.post(
@@ -224,7 +224,6 @@ class SupersetProvisioner:
         resp.raise_for_status()
         dashboard_id = resp.json()["id"]
 
-        # Привязываем charts к dashboard
         self._add_charts_to_dashboard(dashboard_id, chart_ids)
 
         logger.info(f"Dashboard '{title}' created (id={dashboard_id})")
@@ -284,13 +283,60 @@ class SupersetProvisioner:
         return json.dumps(layout)
 
     def _add_charts_to_dashboard(self, dashboard_id: int, chart_ids: list[int]):
-        """Привязываем charts к dashboard через update."""
+        """Привязываем charts к dashboard через update position_json и slices."""
+        import json
+
+        position_json = self._build_dashboard_layout(chart_ids)
+        json_metadata = json.dumps({
+            "chart_configuration": {},
+            "native_filter_configuration": [],
+            "timed_refresh_immune_slices": [],
+            "expanded_slices": {},
+            "refresh_frequency": 0,
+            "color_scheme": "",
+            "label_colors": {},
+            "shared_label_colors": {},
+            "default_filters": "{}",
+        })
+
+        resp = self.session.get(f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}")
+        if resp.status_code == 200:
+            current_slices = [s["id"] for s in resp.json().get("result", {}).get("slices", [])]
+            new_slices = [cid for cid in chart_ids if cid not in current_slices]
+            all_slices = list(set(current_slices + chart_ids))
+        else:
+            all_slices = chart_ids
+
         resp = self.session.put(
             f"{SUPERSET_URL}/api/v1/dashboard/{dashboard_id}",
-            json={"owners": [], "json_metadata": f'{{"chart_configuration": {{}}, "native_filter_configuration": [], "timed_refresh_immune_slices": [], "expanded_slices": {{}}, "refresh_frequency": 0, "color_scheme": "", "label_colors": {{}}, "shared_label_colors": {{}}, "default_filters": "{{}}", "chart_ids": {chart_ids}}}'},
+            json={
+                "position_json": position_json,
+                "json_metadata": json_metadata,
+            },
         )
         if resp.status_code not in (200, 201):
-            logger.warning(f"Could not update dashboard metadata: {resp.text}")
+            logger.warning(f"Could not update dashboard layout: {resp.text}")
+
+        for chart_id in all_slices:
+            self._link_chart_to_dashboard(dashboard_id, chart_id)
+
+    def _link_chart_to_dashboard(self, dashboard_id: int, chart_id: int):
+        """Связываем chart с dashboard через API chart update."""
+        resp = self.session.get(f"{SUPERSET_URL}/api/v1/chart/{chart_id}")
+        if resp.status_code != 200:
+            return
+
+        chart_data = resp.json().get("result", {})
+        current_dashboards = [d["id"] for d in chart_data.get("dashboards", [])]
+        if dashboard_id in current_dashboards:
+            return
+
+        resp = self.session.put(
+            f"{SUPERSET_URL}/api/v1/chart/{chart_id}",
+            json={"dashboards": current_dashboards + [dashboard_id]},
+        )
+        if resp.status_code not in (200, 201):
+            logger.warning(f"Could not link chart {chart_id} to dashboard: {resp.text}")
 
     def provision(self):
         """Основной процесс provisioning."""
@@ -325,13 +371,15 @@ class SupersetProvisioner:
             # Chart 2: Роботы по архитектуре (Bar)
             self.charts["robots_by_arch"] = self.create_chart(
                 name="Роботы по архитектуре",
-                viz_type="echarts_timeseries_bar",
+                viz_type="dist_bar",
                 dataset_id=self.datasets["robots"],
                 params={
                     "groupby": ["architecture"],
                     "metrics": [{"expressionType": "SIMPLE", "column": {"column_name": "id"}, "aggregate": "COUNT"}],
                     "row_limit": 100,
                     "color_scheme": "supersetColors",
+                    "show_legend": True,
+                    "y_axis_format": "SMART_NUMBER",
                 },
             )
 

@@ -10,14 +10,23 @@ defineEmits<{
   click: []
 }>()
 
-const statusConfig: Record<RobotStatus, { label: string; color: string; bg: string }> = {
-  active: { label: 'Активен', color: 'text-green-700', bg: 'bg-green-100' },
-  pending: { label: 'Ожидание', color: 'text-yellow-700', bg: 'bg-yellow-100' },
-  inactive: { label: 'Неактивен', color: 'text-gray-700', bg: 'bg-gray-100' },
-  error: { label: 'Ошибка', color: 'text-red-700', bg: 'bg-red-100' },
+function getStatusDotClass(status: RobotStatus): string {
+  switch (status) {
+    case 'active': return 'term-status-dot-active'
+    case 'pending': return 'term-status-dot-pending'
+    case 'error': return 'term-status-dot-error'
+    default: return 'term-status-dot-inactive'
+  }
 }
 
-const statusInfo = computed(() => statusConfig[props.robot.status])
+function getStatusLabel(status: RobotStatus): string {
+  switch (status) {
+    case 'active': return 'Активен'
+    case 'pending': return 'Ожидание'
+    case 'error': return 'Ошибка'
+    default: return 'Неактивен'
+  }
+}
 
 const lastSeenFormatted = computed(() => {
   if (!props.robot.last_seen_at) return 'Никогда'
@@ -39,39 +48,94 @@ const lastSeenFormatted = computed(() => {
 
 <template>
   <div
-    class="card hover:shadow-md transition-shadow cursor-pointer"
+    class="term-card term-robot-card"
     @click="$emit('click')"
   >
-    <div class="flex items-start justify-between">
-      <div class="flex-1 min-w-0">
-        <h3 class="text-lg font-medium text-gray-900 truncate">
-          {{ robot.name }}
-        </h3>
-        <p class="text-sm text-gray-500 truncate">
-          {{ robot.hostname }}
-        </p>
+    <div class="term-robot-card-header">
+      <div style="flex: 1; min-width: 0;">
+        <h3 class="term-robot-card-name">{{ robot.name }}</h3>
+        <p class="term-robot-card-hostname">{{ robot.hostname }}</p>
       </div>
-      <span
-        :class="[statusInfo.color, statusInfo.bg]"
-        class="ml-2 px-2.5 py-0.5 rounded-full text-xs font-medium"
-      >
-        {{ statusInfo.label }}
+      <span class="term-status-cell">
+        <span class="term-status-dot" :class="getStatusDotClass(robot.status)"></span>
+        <span :class="'term-status-' + robot.status" class="term-fs-2xs">{{ getStatusLabel(robot.status) }}</span>
       </span>
     </div>
 
-    <div class="mt-4 grid grid-cols-2 gap-4 text-sm">
-      <div>
-        <p class="text-gray-500">IP-адрес</p>
-        <p class="font-medium text-gray-900">{{ robot.ip_address || '—' }}</p>
-      </div>
-      <div>
-        <p class="text-gray-500">Архитектура</p>
-        <p class="font-medium text-gray-900">{{ robot.architecture }}</p>
-      </div>
-      <div class="col-span-2">
-        <p class="text-gray-500">Последняя активность</p>
-        <p class="font-medium text-gray-900">{{ lastSeenFormatted }}</p>
-      </div>
-    </div>
+    <table class="term-robot-card-info">
+      <tbody>
+        <tr>
+          <td>IP</td>
+          <td>{{ robot.ip_address || '—' }}</td>
+        </tr>
+        <tr>
+          <td>Arch</td>
+          <td>{{ robot.architecture }}</td>
+        </tr>
+        <tr>
+          <td>Last</td>
+          <td>{{ lastSeenFormatted }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </template>
+
+<style scoped>
+.term-robot-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.term-robot-card:hover {
+  border-color: var(--accent);
+}
+
+.term-robot-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.term-robot-card-name {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.term-robot-card-hostname {
+  font-size: var(--fs-2xs);
+  color: var(--text-dim);
+  margin: 0.125rem 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.term-robot-card-info {
+  width: 100%;
+  font-size: var(--fs-2xs);
+  border-collapse: collapse;
+}
+
+.term-robot-card-info td {
+  padding: 0.125rem 0;
+  border: none;
+}
+
+.term-robot-card-info td:first-child {
+  color: var(--text-dim);
+  width: 3rem;
+}
+
+.term-robot-card-info td:last-child {
+  text-align: left;
+  color: var(--text);
+}
+</style>

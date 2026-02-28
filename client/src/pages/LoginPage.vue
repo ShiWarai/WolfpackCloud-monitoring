@@ -21,74 +21,79 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-md w-full space-y-8">
-      <div class="text-center">
-        <h1 class="text-3xl font-bold text-primary-600">WolfpackCloud</h1>
-        <h2 class="mt-2 text-xl text-gray-600">Monitoring</h2>
-        <p class="mt-4 text-gray-500">Войдите в систему</p>
+  <div class="term-auth-page">
+    <div class="term-auth-container">
+      <div class="term-auth-header">
+        <img src="/icon.svg" alt="" style="height: 3rem; margin-bottom: 1rem;">
+        <h1>WolfpackCloud</h1>
+        <p>Monitoring · Вход</p>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="card space-y-6">
-        <div v-if="authStore.error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+      <form @submit.prevent="handleSubmit" class="term-card">
+        <div v-if="authStore.error" class="term-alert term-alert-error">
           {{ authStore.error }}
         </div>
 
-        <div>
-          <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
-            Email
-          </label>
-          <input
-            id="email"
-            v-model="email"
-            type="email"
-            required
-            autocomplete="email"
-            class="input"
-            placeholder="example@email.com"
-          />
-        </div>
-
-        <div>
-          <label for="password" class="block text-sm font-medium text-gray-700 mb-1">
-            Пароль
-          </label>
-          <div class="relative">
+        <div class="term-form">
+          <div class="term-field">
+            <label for="email">Email</label>
             <input
-              id="password"
-              v-model="password"
-              :type="showPassword ? 'text' : 'password'"
+              id="email"
+              v-model="email"
+              type="email"
               required
-              autocomplete="current-password"
-              class="input pr-10"
-              placeholder="••••••••"
+              autocomplete="email"
+              class="term-input"
+              style="max-width: none;"
+              placeholder="operator@example.com"
             />
-            <button
-              type="button"
-              @click="showPassword = !showPassword"
-              class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-            >
-              <span class="text-sm">{{ showPassword ? 'Скрыть' : 'Показать' }}</span>
-            </button>
           </div>
+
+          <div class="term-field">
+            <label for="password">Пароль</label>
+            <div style="position: relative;">
+              <input
+                id="password"
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                required
+                autocomplete="current-password"
+                class="term-input"
+                style="max-width: none; padding-right: 5rem;"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                @click="showPassword = !showPassword"
+                style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: var(--fs-2xs);"
+              >
+                {{ showPassword ? 'Скрыть' : 'Показать' }}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            :disabled="authStore.loading"
+            class="term-btn term-btn-primary"
+            style="width: 100%; margin-top: 0.5rem;"
+          >
+            <span v-if="authStore.loading">Вход...</span>
+            <span v-else>Войти</span>
+          </button>
         </div>
-
-        <button
-          type="submit"
-          :disabled="authStore.loading"
-          class="btn-primary w-full"
-        >
-          <span v-if="authStore.loading">Вход...</span>
-          <span v-else>Войти</span>
-        </button>
-
-        <p class="text-center text-sm text-gray-600">
-          Нет аккаунта?
-          <RouterLink to="/register" class="text-primary-600 hover:text-primary-700 font-medium">
-            Зарегистрироваться
-          </RouterLink>
-        </p>
       </form>
+
+      <p class="term-text-dim" style="text-align: center; margin-top: 1rem;">
+        Нет аккаунта?
+        <RouterLink to="/register" class="term-btn" style="margin-left: 0.5rem;">
+          Регистрация
+        </RouterLink>
+      </p>
     </div>
+    
+    <footer class="term-footer" style="position: fixed; bottom: 0; left: 0; right: 0;">
+      WolfpackCloud — monitoring
+    </footer>
   </div>
 </template>

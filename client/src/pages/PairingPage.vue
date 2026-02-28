@@ -115,114 +115,111 @@ function reset() {
 
 <template>
   <DefaultLayout>
-    <div class="max-w-lg mx-auto space-y-6">
-      <div class="text-center">
-        <h1 class="text-2xl font-bold text-gray-900">Привязка робота</h1>
-        <p class="text-gray-500 mt-1">
-          Введите 8-значный код с экрана робота
-        </p>
+    <div style="max-width: 30rem; margin: 0 auto;">
+      <div class="term-page-title-row">
+        <h1 class="term-page-title">Привязка робота</h1>
+      </div>
+      <p class="term-text-dim term-mb-1">
+        Введите 8-значный код с экрана робота
+      </p>
+
+      <div v-if="success" class="term-card term-alert-success" style="text-align: center; border-color: rgba(34, 197, 94, 0.5);">
+        <p style="font-size: 1.25rem; margin: 0.5rem 0;">Робот успешно привязан!</p>
+        <p class="term-text-dim">Перенаправление...</p>
       </div>
 
-      <div v-if="success" class="card bg-green-50 border-green-200 text-center">
-        <svg class="mx-auto h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-        </svg>
-        <p class="mt-4 text-lg font-medium text-green-700">Робот успешно привязан!</p>
-        <p class="text-green-600">Перенаправление...</p>
-      </div>
-
-      <div v-else class="card space-y-6">
-        <div v-if="error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+      <div v-else class="term-card">
+        <div v-if="error" class="term-alert term-alert-error">
           {{ error }}
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-3 text-center">
-            Код привязки
-          </label>
-          <div class="flex justify-center gap-2" @paste="handlePaste">
-            <input
-              v-for="(_, index) in codeInputs"
-              :id="`code-${index}`"
-              :key="index"
-              v-model="codeInputs[index]"
-              type="text"
-              maxlength="1"
-              class="w-10 h-12 text-center text-xl font-mono font-bold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent uppercase"
-              @input="handleCodeInput(index, $event)"
-              @keydown="handleKeyDown(index, $event)"
-            />
-          </div>
-        </div>
-
-        <div v-if="loading" class="text-center py-4">
-          <div class="inline-block animate-spin rounded-full h-6 w-6 border-4 border-primary-500 border-t-transparent"></div>
-          <p class="mt-2 text-sm text-gray-500">Проверка кода...</p>
-        </div>
-
-        <div v-else-if="codeInfo" class="space-y-4">
-          <div class="bg-gray-50 rounded-lg p-4">
-            <h3 class="text-sm font-medium text-gray-700 mb-2">Информация о роботе</h3>
-            <dl class="space-y-1 text-sm">
-              <div class="flex justify-between">
-                <dt class="text-gray-500">Hostname:</dt>
-                <dd class="font-medium text-gray-900">{{ codeInfo.robot?.hostname }}</dd>
-              </div>
-              <div class="flex justify-between">
-                <dt class="text-gray-500">IP-адрес:</dt>
-                <dd class="font-medium text-gray-900">{{ codeInfo.robot?.ip_address || '—' }}</dd>
-              </div>
-              <div class="flex justify-between">
-                <dt class="text-gray-500">Архитектура:</dt>
-                <dd class="font-medium text-gray-900">{{ codeInfo.robot?.architecture }}</dd>
-              </div>
-            </dl>
-          </div>
-
-          <div v-if="codeInfo.status === 'pending'">
-            <label for="robotName" class="block text-sm font-medium text-gray-700 mb-1">
-              Имя робота (опционально)
-            </label>
-            <input
-              id="robotName"
-              v-model="robotName"
-              type="text"
-              class="input"
-              placeholder="Введите понятное имя для робота"
-            />
-          </div>
-
-          <div v-if="codeInfo.status === 'pending'" class="flex gap-3">
-            <button
-              type="button"
-              @click="reset"
-              class="btn-secondary flex-1"
+        <div class="term-form">
+          <div class="term-field">
+            <label style="text-align: center; display: block;">Код привязки</label>
+            <div
+              style="display: flex; justify-content: center; gap: 0.375rem; margin-top: 0.5rem;"
+              @paste="handlePaste"
             >
-              Отмена
-            </button>
-            <button
-              type="button"
-              @click="confirmPairing"
-              :disabled="loading"
-              class="btn-primary flex-1"
-            >
-              Подтвердить привязку
-            </button>
+              <input
+                v-for="(_, index) in codeInputs"
+                :id="`code-${index}`"
+                :key="index"
+                v-model="codeInputs[index]"
+                type="text"
+                maxlength="1"
+                class="term-code-input"
+                @input="handleCodeInput(index, $event)"
+                @keydown="handleKeyDown(index, $event)"
+              />
+            </div>
           </div>
 
-          <div v-else-if="codeInfo.status === 'confirmed'" class="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg text-center">
-            Этот код уже был использован
+          <div v-if="loading" style="text-align: center; padding: 1rem 0;">
+            <p class="term-text-dim">Проверка кода...</p>
           </div>
 
-          <div v-else-if="codeInfo.status === 'expired'" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-center">
-            Срок действия кода истёк
+          <div v-else-if="codeInfo">
+            <div class="term-card" style="background: var(--bg); margin-top: 1rem;">
+              <h2 style="margin-bottom: 0.5rem;">Информация о роботе</h2>
+              <table class="term-table" style="font-size: var(--fs-2xs);">
+                <tbody>
+                  <tr>
+                    <td style="color: var(--text-dim); width: 40%;">Hostname</td>
+                    <td>{{ codeInfo.robot?.hostname }}</td>
+                  </tr>
+                  <tr>
+                    <td style="color: var(--text-dim);">IP-адрес</td>
+                    <td>{{ codeInfo.robot?.ip_address || '—' }}</td>
+                  </tr>
+                  <tr>
+                    <td style="color: var(--text-dim);">Архитектура</td>
+                    <td>{{ codeInfo.robot?.architecture }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-if="codeInfo.status === 'pending'" class="term-field" style="margin-top: 1rem;">
+              <label for="robotName">Имя робота (опционально)</label>
+              <input
+                id="robotName"
+                v-model="robotName"
+                type="text"
+                class="term-input"
+                style="max-width: none;"
+                placeholder="Понятное имя для робота"
+              />
+            </div>
+
+            <div v-if="codeInfo.status === 'pending'" style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+              <button type="button" @click="reset" class="term-btn" style="flex: 1;">
+                Отмена
+              </button>
+              <button
+                type="button"
+                @click="confirmPairing"
+                :disabled="loading"
+                class="term-btn term-btn-primary"
+                style="flex: 1;"
+              >
+                Подтвердить
+              </button>
+            </div>
+
+            <div v-else-if="codeInfo.status === 'confirmed'" class="term-alert" style="border-color: #fbbf24; color: #fbbf24; margin-top: 1rem; text-align: center;">
+              Этот код уже был использован
+            </div>
+
+            <div v-else-if="codeInfo.status === 'expired'" class="term-alert term-alert-error" style="margin-top: 1rem; text-align: center;">
+              Срок действия кода истёк
+            </div>
           </div>
         </div>
       </div>
 
-      <div class="card bg-blue-50 border-blue-200">
-        <h3 class="text-sm font-medium text-blue-800 mb-2">Как получить код?</h3>
-        <ol class="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+      <div class="term-card term-mt-1">
+        <h2>Как получить код?</h2>
+        <ol style="padding-left: 1.25rem; margin: 0; color: var(--text-dim); font-size: var(--fs-sm);">
           <li>Установите агент на робота</li>
           <li>Запустите команду установки</li>
           <li>Код появится в терминале</li>
@@ -232,3 +229,24 @@ function reset() {
     </div>
   </DefaultLayout>
 </template>
+
+<style scoped>
+.term-code-input {
+  width: 2.25rem;
+  height: 2.75rem;
+  text-align: center;
+  font-size: 1.25rem;
+  font-family: var(--font);
+  font-weight: 600;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  text-transform: uppercase;
+  outline: none;
+}
+
+.term-code-input:focus {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(230, 126, 34, 0.2);
+}
+</style>
