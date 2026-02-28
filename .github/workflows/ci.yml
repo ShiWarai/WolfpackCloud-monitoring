@@ -262,7 +262,7 @@ jobs:
           format: markdown
           disable_notification: true
           message: |
-            *CI прошёл успешно*
+            ✅ *CI прошёл успешно*
             Репо: `${{ github.repository }}`
             Ветка: `${{ github.ref_name }}`
             [Открыть run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
@@ -282,7 +282,7 @@ jobs:
           token: ${{ secrets.TELEGRAM_TOKEN }}
           format: markdown
           message: |
-            *CI упал*
+            ❌ *CI упал*
             Репо: `${{ github.repository }}`
             Ветка: `${{ github.ref_name }}`
             [Открыть run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
