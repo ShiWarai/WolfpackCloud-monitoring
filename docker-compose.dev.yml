@@ -1,0 +1,53 @@
+# Расширение для разработки
+# Использование: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+services:
+  # Прямой доступ к PostgreSQL
+  postgres:
+    ports:
+      - "5432:5432"
+
+  # Прямой доступ к InfluxDB
+  influxdb:
+    ports:
+      - "8086:8086"
+
+  # API с hot reload
+  api:
+    build:
+      context: ./server/api
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server/api/app:/app/app:ro
+    environment:
+      DEBUG: "true"
+      RELOAD: "true"
+
+  # Прямой доступ к Grafana
+  grafana:
+    ports:
+      - "3000:3000"
+    environment:
+      GF_LOG_LEVEL: debug
+      GF_SECURITY_ADMIN_PASSWORD: admin
+
+  # Прямой доступ к Superset
+  superset:
+    ports:
+      - "8088:8088"
+    environment:
+      SUPERSET_ENV: development
+      FLASK_DEBUG: "1"
+
+  # Прямой доступ к Redis
+  redis:
+    ports:
+      - "6379:6379"
+
+  # Nginx отключен в dev-режиме — прямой доступ к сервисам
+  nginx:
+    profiles:
+      - disabled

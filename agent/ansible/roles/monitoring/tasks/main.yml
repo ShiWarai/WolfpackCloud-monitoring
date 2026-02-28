@@ -1,0 +1,169 @@
+---
+# =============================================================================
+# Главный файл задач роли monitoring
+# =============================================================================
+
+- name: Сбор фактов о системе
+  ansible.builtin.setup:
+    gather_subset:
+      - hardware
+      - network
+      - distribution
+
+- name: Определение архитектуры
+  ansible.builtin.set_fact:
+    robot_architecture: >-
+      {{ 'arm64' if ansible_architecture == 'aarch64' else
+         'amd64' if ansible_architecture == 'x86_64' else
+         'armhf' if ansible_architecture == 'armv7l' else
+         'unknown' }}
+
+- name: Вывод информации о системе
+  ansible.builtin.debug:
+    msg: |
+      Hostname: {{ ansible_hostname }}
+      Architecture: {{ robot_architecture }}
+      Distribution: {{ ansible_distribution }} {{ ansible_distribution_version }}
+      IP Address: {{ ansible_default_ipv4.address | default('unknown') }}
+
+# Установка Telegraf
+- name: Добавление GPG ключа InfluxData
+  ansible.builtin.apt_key:
+    url: https://repos.influxdata.com/influxdata-archive_compat.key
+    state: present
+  when: ansible_os_family == 'Debian'
+  tags:
+    - install
+
+- name: Добавление репозитория InfluxData (Debian/Ubuntu)
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [signed-by=/etc/apt/trusted.gpg.d/influxdata-archive_compat.gpg]
+      https://repos.influxdata.com/debian stable main
+    state: present
+    filename: influxdata
+  when: ansible_os_family == 'Debian'
+  tags:
+    - install
+
+- name: Установка Telegraf
+  ansible.builtin.package:
+    name: telegraf
+    state: present
+    update_cache: true
+  tags:
+    - install
+
+# Генерация кода привязки
+- name: Генерация 8-значного кода привязки
+  ansible.builtin.set_fact:
+    pair_code: >-
+      {{ lookup('community.general.random_string', length=8, upper=true,
+      numbers=true, special=false, override_all='ABCDEFGHJKLMNPQRSTUVWXYZ23456789') }}
+  tags:
+    - configure
+
+- name: Вывод кода привязки
+  ansible.builtin.debug:
+    msg: |
+      ╔══════════════════════════════════════════════════════════════════╗
+      ║   Код привязки для {{ ansible_hostname }}:
+      ║
+      ║              {{ pair_code }}
+      ║
+      ║   Введите этот код в панели мониторинга для активации.
+      ╚══════════════════════════════════════════════════════════════════╝
+  tags:
+    - configure
+
+# Регистрация робота на сервере
+- name: Регистрация робота на сервере мониторинга
+  ansible.builtin.uri:
+    url: "{{ monitoring_server_url }}/api/pair"
+    method: POST
+    body_format: json
+    body:
+      hostname: "{{ ansible_hostname }}"
+      name: "{{ robot_name }}"
+      ip_address: "{{ ansible_default_ipv4.address | default('unknown') }}"
+      architecture: "{{ robot_architecture }}"
+      pair_code: "{{ pair_code }}"
+    status_code: [201, 409]
+    return_content: true
+  register: registration_result
+  tags:
+    - configure
+
+- name: Сохранение результата регистрации
+  ansible.builtin.set_fact:
+    registration_response: "{{ registration_result.json }}"
+  when: registration_result.status == 201
+  tags:
+    - configure
+
+# Настройка Telegraf
+- name: Создание конфигурации Telegraf
+  ansible.builtin.template:
+    src: telegraf.conf.j2
+    dest: "{{ telegraf_conf_dir }}/telegraf.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart Telegraf
+  tags:
+    - configure
+
+# Настройка rsyslog для отправки логов в Telegraf
+- name: Настройка rsyslog для Telegraf
+  ansible.builtin.copy:
+    content: |
+      # Отправка логов в Telegraf
+      *.* @127.0.0.1:6514
+    dest: /etc/rsyslog.d/50-telegraf.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - Restart rsyslog
+  tags:
+    - configure
+
+# Сохранение кода привязки
+- name: Сохранение кода привязки
+  ansible.builtin.copy:
+    content: "{{ pair_code }}"
+    dest: "{{ telegraf_conf_dir }}/.pair_code"
+    owner: root
+    group: root
+    mode: '0600'
+  tags:
+    - configure
+
+# Запуск Telegraf
+- name: Включение и запуск Telegraf
+  ansible.builtin.systemd:
+    name: telegraf
+    state: started
+    enabled: true
+    daemon_reload: true
+  tags:
+    - configure
+
+# Вывод итогов
+- name: Итоговая информация
+  ansible.builtin.debug:
+    msg: |
+      ╔══════════════════════════════════════════════════════════════════╗
+      ║   Установка завершена для {{ ansible_hostname }}
+      ║
+      ║   Код привязки: {{ pair_code }}
+      ║
+      ║   Следующие шаги:
+      ║   1. Откройте панель Grafana: {{ monitoring_server_url }}
+      ║   2. Перейдите в Dashboard → "Роботы"
+      ║   3. Нажмите "Добавить робота"
+      ║   4. Введите код: {{ pair_code }}
+      ╚══════════════════════════════════════════════════════════════════╝
+  tags:
+    - configure

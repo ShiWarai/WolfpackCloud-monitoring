@@ -1,0 +1,16 @@
+---
+# =============================================================================
+# Handlers для роли monitoring
+# =============================================================================
+
+- name: Restart Telegraf
+  ansible.builtin.systemd:
+    name: telegraf
+    state: restarted
+    daemon_reload: true
+
+- name: Restart rsyslog
+  ansible.builtin.systemd:
+    name: rsyslog
+    state: restarted
+  ignore_errors: true

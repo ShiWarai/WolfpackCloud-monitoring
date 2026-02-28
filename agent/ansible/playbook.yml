@@ -1,0 +1,33 @@
+---
+# =============================================================================
+# WolfpackCloud Monitoring — Ansible Playbook
+# Пакетная установка агентов мониторинга на роботов
+# =============================================================================
+#
+# Использование:
+#   ansible-playbook -i inventory.yml playbook.yml
+#
+# Опции:
+#   --tags install    — только установка
+#   --tags configure  — только настройка
+#   --tags uninstall  — удаление агента
+#   -e "server_url=https://monitoring.example.com" — URL сервера
+#
+
+- name: Установка агента мониторинга WolfpackCloud
+  hosts: robots
+  become: true
+  gather_facts: true
+
+  vars:
+    # URL сервера мониторинга (обязательно переопределить!)
+    monitoring_server_url: "{{ server_url | default('http://localhost:8000') }}"
+
+    # Имя робота (по умолчанию - hostname)
+    robot_name: "{{ custom_name | default(ansible_hostname) }}"
+
+  roles:
+    - role: monitoring
+      tags:
+        - install
+        - configure

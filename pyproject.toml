@@ -1,0 +1,79 @@
+[project]
+name = "wolfpackcloud-monitoring"
+version = "0.1.0"
+description = "Подсистема мониторинга для экосистемы WolfpackCloud"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "WolfpackCloud Team"}
+]
+keywords = ["monitoring", "robotics", "telegraf", "influxdb", "grafana"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Monitoring",
+]
+
+[project.urls]
+Homepage = "https://github.com/ShiWarai/WolfpackCloud-monitoring"
+Documentation = "https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki"
+Repository = "https://github.com/ShiWarai/WolfpackCloud-monitoring"
+Issues = "https://github.com/ShiWarai/WolfpackCloud-monitoring/issues"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["server/api"]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults (FastAPI Depends)
+    "B904",   # Within an `except` clause, raise exceptions with `raise ... from err`
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+testpaths = ["server/api/tests", "tests"]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["server/api/app"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
