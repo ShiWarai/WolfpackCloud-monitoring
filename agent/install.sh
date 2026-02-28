@@ -21,8 +21,11 @@ NC='\033[0m' # No Color
 # Конфигурация по умолчанию
 SERVER_URL=""
 ROBOT_NAME=""
+DOCKER_MODE=false
+METRICS_URL=""  # Явный URL для отправки метрик (если отличается от SERVER_URL)
 TELEGRAF_CONF_DIR="/etc/telegraf"
 TELEGRAF_CONF_FILE="${TELEGRAF_CONF_DIR}/telegraf.conf"
+TELEGRAF_CONTAINER_NAME="wpc-monitoring-agent"
 
 # Логирование
 log_info() {
@@ -84,8 +87,13 @@ detect_distro() {
 
 # Генерация 8-значного кода привязки
 generate_pair_code() {
-    # Генерируем 8-значный буквенно-цифровой код (без похожих символов: 0,O,1,l,I)
-    tr -dc 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' < /dev/urandom | head -c 8
+    local chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    local code=""
+    local i
+    for i in $(seq 1 8); do
+        code="${code}${chars:$((RANDOM % ${#chars})):1}"
+    done
+    echo "$code"
 }
 
 # Получение hostname
@@ -140,6 +148,23 @@ EOF
     esac
     
     log_success "Telegraf установлен"
+}
+
+# Установка Telegraf в Docker-режиме (проверка Docker, pull образа)
+install_telegraf_docker() {
+    log_info "Режим Docker: проверка наличия Docker..."
+
+    if ! command -v docker &>/dev/null; then
+        log_error "Docker не найден. Установите Docker: https://docs.docker.com/engine/install/"
+    fi
+
+    if ! docker info &>/dev/null; then
+        log_error "Docker daemon недоступен. Убедитесь, что Docker запущен и у вас есть права."
+    fi
+
+    log_info "Загрузка образа Telegraf..."
+    docker pull telegraf:1.32-alpine
+    log_success "Telegraf (Docker) готов"
 }
 
 # Регистрация робота на сервере
@@ -244,16 +269,27 @@ configure_telegraf() {
     local robot_token="$1"
     local api_url="$2"
     local robot_name="$3"
-    
-    log_info "Настройка Telegraf..."
-    
-    # Бэкап существующей конфигурации
-    if [ -f "$TELEGRAF_CONF_FILE" ]; then
-        cp "$TELEGRAF_CONF_FILE" "${TELEGRAF_CONF_FILE}.backup.$(date +%Y%m%d%H%M%S)"
+    local conf_file="$TELEGRAF_CONF_FILE"
+
+    # Используем явно указанный METRICS_URL, если задан
+    if [ -n "$METRICS_URL" ]; then
+        api_url="$METRICS_URL"
     fi
-    
+
+    if [ "$DOCKER_MODE" = true ]; then
+        conf_file="${AGENT_DATA_DIR:-/tmp}/telegraf.conf"
+        mkdir -p "$(dirname "$conf_file")"
+    fi
+
+    log_info "Настройка Telegraf..."
+
+    # Бэкап существующей конфигурации (только для нативного режима)
+    if [ "$DOCKER_MODE" = false ] && [ -f "$conf_file" ]; then
+        cp "$conf_file" "${conf_file}.backup.$(date +%Y%m%d%H%M%S)"
+    fi
+
     # Создаём конфигурацию
-    cat > "$TELEGRAF_CONF_FILE" << EOF
+    cat > "$conf_file" << EOF
 # Конфигурация Telegraf для WolfpackCloud Monitoring
 # Сгенерировано автоматически: $(date -Iseconds)
 # Робот: ${robot_name}
@@ -340,21 +376,24 @@ configure_telegraf() {
   files = ["/var/log/syslog", "/var/log/messages"]
   from_beginning = false
   data_format = "grok"
-  grok_patterns = ["%{SYSLOGTIMESTAMP:timestamp} %{SYSLOGHOST:hostname} %{PROG:program}(?:\\[%{POSINT:pid}\\])?: %{GREEDYDATA:message}"]
+  grok_patterns = ['%{SYSLOGTIMESTAMP:timestamp} %{SYSLOGHOST:hostname} %{PROG:program}(?:\[%{POSINT:pid}\])?: %{GREEDYDATA:message}']
   name_override = "syslog"
   [inputs.tail.tags]
     source = "file"
 
 EOF
 
-    # Настройка rsyslog для отправки логов в Telegraf
-    if [ -d /etc/rsyslog.d ]; then
+    # Настройка rsyslog для отправки логов в Telegraf (только нативный режим)
+    if [ "$DOCKER_MODE" = false ] && [ -d /etc/rsyslog.d ]; then
         cat > /etc/rsyslog.d/50-telegraf.conf << 'RSYSLOG'
 # Отправка логов в Telegraf
 *.* @127.0.0.1:6514
 RSYSLOG
         systemctl restart rsyslog 2>/dev/null || true
     fi
+
+    # Сохраняем путь к конфигу для Docker-режима
+    TELEGRAF_CONF_FILE="$conf_file"
     
     log_success "Telegraf настроен"
 }
@@ -362,17 +401,47 @@ RSYSLOG
 # Запуск Telegraf
 start_telegraf() {
     log_info "Запуск Telegraf..."
-    
-    systemctl daemon-reload
-    systemctl enable telegraf
-    systemctl restart telegraf
-    
-    # Проверка статуса
-    sleep 2
-    if systemctl is-active --quiet telegraf; then
-        log_success "Telegraf запущен и работает"
+
+    if [ "$DOCKER_MODE" = true ]; then
+        # Остановить и удалить старый контейнер, если есть
+        docker rm -f "$TELEGRAF_CONTAINER_NAME" 2>/dev/null || true
+
+        # Путь к конфигу для volume: хост-путь если задан (для make agent), иначе локальный
+        local conf_volume_path="${TELEGRAF_CONF_HOST_PATH:-$TELEGRAF_CONF_FILE}"
+
+        local docker_args=(
+            run -d
+            --name "$TELEGRAF_CONTAINER_NAME"
+            --restart unless-stopped
+            -v "${conf_volume_path}:/etc/telegraf/telegraf.conf:ro"
+        )
+
+        # Подключить к сети мониторинга, если указана
+        if [ -n "${DOCKER_NETWORK:-}" ]; then
+            docker_args+=(--network "$DOCKER_NETWORK")
+        fi
+
+        docker_args+=(telegraf:1.32-alpine)
+
+        docker "${docker_args[@]}" || log_error "Не удалось запустить контейнер Telegraf"
+
+        sleep 2
+        if docker ps --format '{{.Names}}' | grep -q "^${TELEGRAF_CONTAINER_NAME}$"; then
+            log_success "Telegraf (Docker) запущен и работает"
+        else
+            log_error "Не удалось запустить Telegraf. Проверьте: docker logs $TELEGRAF_CONTAINER_NAME"
+        fi
     else
-        log_error "Не удалось запустить Telegraf. Проверьте: journalctl -u telegraf"
+        systemctl daemon-reload
+        systemctl enable telegraf
+        systemctl restart telegraf
+
+        sleep 2
+        if systemctl is-active --quiet telegraf; then
+            log_success "Telegraf запущен и работает"
+        else
+            log_error "Не удалось запустить Telegraf. Проверьте: journalctl -u telegraf"
+        fi
     fi
 }
 
@@ -388,9 +457,15 @@ show_success_info() {
     echo "║   Робот: ${robot_name}                                           "
     echo "║   Сервер: ${SERVER_URL}                                          "
     echo "║                                                                  ║"
-    echo "║   Метрики отправляются через API.                                ║"
-    echo "║   Проверить статус: systemctl status telegraf                    ║"
-    echo "║   Логи: journalctl -u telegraf -f                                ║"
+    if [ "$DOCKER_MODE" = true ]; then
+        echo "║   Метрики отправляются через API (Docker).                        ║"
+        echo "║   Проверить: docker ps | grep $TELEGRAF_CONTAINER_NAME              "
+        echo "║   Логи: docker logs -f $TELEGRAF_CONTAINER_NAME                      "
+    else
+        echo "║   Метрики отправляются через API.                                ║"
+        echo "║   Проверить статус: systemctl status telegraf                    ║"
+        echo "║   Логи: journalctl -u telegraf -f                                ║"
+    fi
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
@@ -408,13 +483,28 @@ parse_args() {
                 ROBOT_NAME="$2"
                 shift 2
                 ;;
+            --docker)
+                DOCKER_MODE=true
+                shift
+                ;;
+            --metrics-url|-m)
+                METRICS_URL="$2"
+                shift 2
+                ;;
             --help|-h)
-                echo "Использование: $0 --server SERVER_URL [--name ROBOT_NAME]"
+                echo "Использование: $0 --server SERVER_URL [--name ROBOT_NAME] [--docker] [--metrics-url URL]"
                 echo ""
                 echo "Опции:"
-                echo "  --server, -s URL    URL сервера мониторинга (обязательно)"
-                echo "  --name, -n NAME     Имя робота (по умолчанию: hostname)"
-                echo "  --help, -h          Показать эту справку"
+                echo "  --server, -s URL       URL сервера мониторинга (обязательно)"
+                echo "  --name, -n NAME        Имя робота (по умолчанию: hostname)"
+                echo "  --docker               Запуск Telegraf в Docker вместо нативной установки"
+                echo "  --metrics-url, -m URL  URL для отправки метрик (по умолчанию: SERVER_URL/api/metrics)"
+                echo "  --help, -h             Показать эту справку"
+                echo ""
+                echo "Примеры:"
+                echo "  $0 --server https://monitoring.example.com"
+                echo "  $0 --server https://monitoring.example.com --name my-robot"
+                echo "  $0 --server https://monitoring.example.com --docker"
                 exit 0
                 ;;
             *)
@@ -444,7 +534,11 @@ main() {
     echo ""
     
     parse_args "$@"
-    check_root
+    
+    # Root нужен только для нативной установки
+    if [ "$DOCKER_MODE" = false ]; then
+        check_root
+    fi
     
     log_info "Архитектура: $(detect_arch)"
     log_info "Дистрибутив: $(detect_distro)"
@@ -457,8 +551,12 @@ main() {
     local pair_code
     pair_code=$(generate_pair_code)
     
-    # Установка Telegraf
-    install_telegraf
+    # Установка Telegraf (нативная или Docker)
+    if [ "$DOCKER_MODE" = true ]; then
+        install_telegraf_docker
+    else
+        install_telegraf
+    fi
     
     # Регистрация на сервере
     register_robot "$pair_code"
@@ -479,8 +577,15 @@ main() {
     show_success_info "$robot_name"
     
     # Сохраняем токен для возможного повторного использования
-    echo "$ROBOT_TOKEN" > /etc/telegraf/.robot_token
-    chmod 600 /etc/telegraf/.robot_token
+    if [ "$DOCKER_MODE" = true ]; then
+        local token_dir="${AGENT_DATA_DIR:-/tmp}"
+        mkdir -p "$token_dir"
+        echo "$ROBOT_TOKEN" > "${token_dir}/.robot_token"
+        chmod 600 "${token_dir}/.robot_token"
+    else
+        echo "$ROBOT_TOKEN" > /etc/telegraf/.robot_token
+        chmod 600 /etc/telegraf/.robot_token
+    fi
 }
 
 main "$@"

@@ -9,12 +9,16 @@
 - [[Server-Setup]]
 - [[Local-Testing]]
 
+### Веб-приложение
+- [[Web-App]]
+
 ### CI/CD
 - [[CI-CD]]
 
 ### Справочник
 - [[API-Reference]]
 - [[Grafana-Dashboards]]
+- [[Superset-Dashboards]]
 
 ### Поддержка
 - [[Troubleshooting]]

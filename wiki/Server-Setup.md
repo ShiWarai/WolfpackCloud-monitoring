@@ -35,18 +35,30 @@ POSTGRES_PASSWORD=your-secure-postgres-password
 INFLUXDB_ADMIN_PASSWORD=your-secure-influxdb-password
 INFLUXDB_ADMIN_TOKEN=your-influxdb-token-min-32-chars
 
-# Безопасность
+# Безопасность API
 SECRET_KEY=your-api-secret-key-min-32-chars
 SUPERSET_SECRET_KEY=your-superset-secret-key-min-32-chars
+
+# JWT аутентификация (для веб-приложения)
+JWT_SECRET_KEY=your-jwt-secret-key-min-32-chars
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
+JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 
 # ОПЦИОНАЛЬНЫЕ ПЕРЕМЕННЫЕ
 
 # Grafana
 GRAFANA_ADMIN_PASSWORD=admin  # Сменить после первого входа!
 
-# Порты (по умолчанию 80/443)
-HTTP_PORT=80
-HTTPS_PORT=443
+# Порты
+API_PORT=9100
+CLIENT_PORT=9101
+GRAFANA_PORT=9200
+SUPERSET_PORT=9300
+
+# Внешние URL для кнопок в веб-приложении
+GRAFANA_ROOT_URL=http://localhost:9200
+SUPERSET_ROOT_URL=http://localhost:9300
 ```
 
 ### 3. Запуск
@@ -72,9 +84,10 @@ curl http://localhost:8000/health
 
 | Сервис | URL | Учётные данные |
 |--------|-----|----------------|
-| Grafana | http://localhost:3000 | admin / admin |
-| API Docs | http://localhost:8000/docs | — |
-| Superset | http://localhost:8088 | admin / admin |
+| Веб-приложение | http://localhost:9101 | Регистрация |
+| API Docs | http://localhost:9100/docs | — |
+| Grafana | http://localhost:9200 | admin / admin |
+| Superset | http://localhost:9300 | admin / admin |
 | InfluxDB | http://localhost:8086 | см. .env |
 
 ## Production настройка
@@ -215,7 +228,7 @@ docker stats
 
 ```bash
 # Проверьте health
-curl http://localhost:8000/health
+curl http://localhost:9100/health
 
 # Проверьте подключение к БД
 docker compose exec api python -c "from app.database import engine; print(engine)"

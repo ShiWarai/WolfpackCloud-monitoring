@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     pair_code_expiration_minutes: int = 15
 
+    # JWT
+    jwt_secret_key: str = "change-me-jwt-secret-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 30
+    jwt_refresh_token_expire_days: int = 7
+
     # PostgreSQL
     database_url: str = "postgresql+asyncpg://monitoring:monitoring@localhost:5432/monitoring"
 

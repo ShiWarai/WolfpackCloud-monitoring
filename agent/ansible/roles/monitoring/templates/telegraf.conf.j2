@@ -1,8 +1,5 @@
-# =============================================================================
 # Конфигурация Telegraf для WolfpackCloud Monitoring
-# Сгенерировано Ansible: {{ ansible_date_time.iso8601 }}
-# Робот: {{ robot_name }}
-# =============================================================================
+# Сгенерировано Ansible для {{ ansible_hostname }}
 
 [global_tags]
   robot = "{{ robot_name }}"
@@ -20,19 +17,20 @@
   precision = "0s"
   hostname = ""
   omit_hostname = false
+  debug = false
+  quiet = false
 
 ###############################################################################
 #                            OUTPUT PLUGINS                                   #
 ###############################################################################
 
-# Отправка метрик через API (проксируется в InfluxDB)
 [[outputs.http]]
   url = "{{ monitoring_server_url }}/api/metrics"
   method = "POST"
   data_format = "influx"
   timeout = "10s"
   content_encoding = "gzip"
-  
+
   [outputs.http.headers]
     Authorization = "Bearer {{ robot_token }}"
     Content-Type = "text/plain; charset=utf-8"
@@ -41,66 +39,57 @@
 #                            INPUT PLUGINS                                    #
 ###############################################################################
 
-# CPU
 [[inputs.cpu]]
   percpu = true
   totalcpu = true
   collect_cpu_time = false
   report_active = false
+  core_tags = false
 
-# Память
 [[inputs.mem]]
 
-# Swap
 [[inputs.swap]]
 
-# Диск
 [[inputs.disk]]
-  ignore_fs = ["tmpfs", "devtmpfs", "devfs", "iso9660", "overlay", "aufs", "squashfs", "nsfs"]
+  ignore_fs = [
+    "tmpfs", "devtmpfs", "devfs", "iso9660",
+    "overlay", "aufs", "squashfs", "nsfs",
+    "fuse.snapfuse", "fuse.lxcfs"
+  ]
 
-# Disk I/O
 [[inputs.diskio]]
 
-# Сеть
 [[inputs.net]]
   ignore_protocol_stats = true
 
-# Система
 [[inputs.system]]
 
-# Процессы
 [[inputs.processes]]
 
-# Температура
 [[inputs.temp]]
 
-# Kernel
 [[inputs.kernel]]
 
-# Системные логи через syslog
 [[inputs.syslog]]
   server = "udp://127.0.0.1:6514"
 
-# Логи из файлов
 [[inputs.tail]]
-  files = ["/var/log/syslog", "/var/log/messages"]
+  files = ["/var/log/syslog", "/var/log/messages", "/var/log/auth.log"]
   from_beginning = false
   data_format = "grok"
-  grok_patterns = ["%{SYSLOGTIMESTAMP:timestamp} %{SYSLOGHOST:logsource} %{PROG:program}(?:\\[%{POSINT:pid}\\])?: %{GREEDYDATA:message}"]
+  grok_patterns = [
+    "%{SYSLOGTIMESTAMP:timestamp} %{SYSLOGHOST:logsource} %{PROG:program}(?:\\[%{POSINT:pid}\\])?: %{GREEDYDATA:message}"
+  ]
   name_override = "syslog"
   [inputs.tail.tags]
     source = "file"
 
-# Внутренние метрики Telegraf
 [[inputs.internal]]
   collect_memstats = false
   [inputs.internal.tags]
     internal = "true"
 
 {% if telegraf_extra_inputs %}
-###############################################################################
-#                       ДОПОЛНИТЕЛЬНЫЕ INPUT PLUGINS                          #
-###############################################################################
-
+# Дополнительные input плагины
 {{ telegraf_extra_inputs }}
 {% endif %}

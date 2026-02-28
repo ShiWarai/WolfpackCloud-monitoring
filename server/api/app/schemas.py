@@ -4,15 +4,70 @@ Pydantic схемы для валидации запросов и ответов
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from app.models import Architecture, PairCodeStatus, RobotStatus
+from app.models import Architecture, PairCodeStatus, RobotStatus, UserRole
 
 __all__ = [
     "Architecture",
     "PairCodeStatus",
     "RobotStatus",
+    "UserRole",
 ]
+
+
+# =============================================================================
+# Схемы для пользователей и аутентификации
+# =============================================================================
+
+
+class UserCreate(BaseModel):
+    """Схема для регистрации пользователя."""
+
+    email: EmailStr = Field(..., description="Email пользователя")
+    password: str = Field(..., min_length=8, max_length=128, description="Пароль")
+    name: str = Field(..., min_length=1, max_length=255, description="Имя пользователя")
+
+
+class UserLogin(BaseModel):
+    """Схема для входа пользователя."""
+
+    email: EmailStr = Field(..., description="Email пользователя")
+    password: str = Field(..., description="Пароль")
+
+
+class UserResponse(BaseModel):
+    """Схема ответа с информацией о пользователе."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    email: str
+    name: str
+    role: UserRole
+    is_active: bool
+    created_at: datetime
+
+
+class UserUpdate(BaseModel):
+    """Схема для обновления пользователя."""
+
+    name: str | None = Field(None, min_length=1, max_length=255)
+
+
+class TokenResponse(BaseModel):
+    """Схема ответа с токенами."""
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int = Field(..., description="Время жизни access токена в секундах")
+
+
+class RefreshTokenRequest(BaseModel):
+    """Схема запроса на обновление токена."""
+
+    refresh_token: str = Field(..., description="Refresh токен")
 
 
 # =============================================================================
@@ -57,6 +112,7 @@ class RobotResponse(RobotBase):
 
     id: int
     status: RobotStatus
+    owner_id: int | None = None
     created_at: datetime
     updated_at: datetime
     last_seen_at: datetime | None = None

@@ -57,7 +57,11 @@ services:
       INFLUXDB_ORG: ${INFLUXDB_ORG:-wolfpackcloud}
       INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-robots}
       SECRET_KEY: ${SECRET_KEY:?Задайте SECRET_KEY в .env}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Задайте JWT_SECRET_KEY в .env}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
       API_BASE_URL: ${API_BASE_URL:-http://localhost:9100}
+      DEBUG: ${DEBUG:-false}
     ports:
       - "${API_PORT:-9100}:8000"
     depends_on:
@@ -67,6 +71,30 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - monitoring
+
+  # Client — Vue 3 веб-приложение
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_GRAFANA_URL: ${GRAFANA_ROOT_URL:-http://localhost:9200}
+        VITE_SUPERSET_URL: ${SUPERSET_ROOT_URL:-http://localhost:9300}
+    container_name: wpc-monitoring-client
+    restart: unless-stopped
+    ports:
+      - "${CLIENT_PORT:-9101}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -177,6 +205,24 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+    networks:
+      - monitoring
+
+  # Superset Provisioning — создание дефолтных datasource, datasets, dashboard
+  superset-provision:
+    image: apache/superset:4.1.1-dev
+    container_name: wpc-monitoring-superset-provision
+    command: ["python", "/app/docker/provision.py"]
+    user: "root"
+    environment:
+      <<: *superset-env
+      SUPERSET_URL: http://superset:8088
+      SUPERSET_ADMIN_USERNAME: admin
+      SUPERSET_ADMIN_PASSWORD: admin
+    volumes: *superset-volumes
+    depends_on:
+      superset:
+        condition: service_healthy
     networks:
       - monitoring
 

@@ -21,18 +21,36 @@ docker compose up -d
 curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/main/agent/install.sh | sudo bash -s -- --server https://YOUR_SERVER_URL
 ```
 
-После установки введите 8-значный код в Grafana (http://localhost:3000) для привязки робота.
+После установки:
+1. Откройте веб-приложение: http://localhost:9101
+2. Зарегистрируйтесь или войдите
+3. Введите 8-значный код с робота для привязки
+
+## Порты
+
+| Сервис | Порт | Описание |
+|--------|------|----------|
+| Client | 9101 | Веб-приложение (Vue 3) |
+| API | 9100 | REST API (FastAPI) |
+| Grafana | 9200 | Дашборды метрик |
+| Superset | 9300 | BI-аналитика |
 
 ## Стек
 
-Telegraf → FastAPI → InfluxDB → Grafana
+```
+Robot: Telegraf Agent
+        ↓
+Server: Vue 3 → FastAPI → PostgreSQL
+                    ↓
+              InfluxDB → Grafana
+```
 
 ## Документация
 
 - [Архитектура](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Architecture)
 - [Установка агента](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Installation)
 - [Настройка сервера](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Server-Setup)
-- [Локальное тестирование](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Local-Testing)
+- [Веб-приложение](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Web-App)
 - [API Reference](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/API-Reference)
 
 ## Лицензия

@@ -1,16 +1,23 @@
 """
 SQLAlchemy ORM модели.
 
-Определяет структуру таблиц для хранения информации о роботах и кодах привязки.
+Определяет структуру таблиц для хранения информации о пользователях, роботах и кодах привязки.
 """
 
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+
+class UserRole(enum.StrEnum):
+    """Роли пользователей."""
+
+    USER = "user"
+    ADMIN = "admin"
 
 
 class RobotStatus(enum.StrEnum):
@@ -38,6 +45,33 @@ class PairCodeStatus(enum.StrEnum):
     EXPIRED = "expired"
 
 
+class User(Base):
+    """Модель пользователя."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[UserRole] = mapped_column(
+        Enum(UserRole, name="user_role", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=UserRole.USER,
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    robots: Mapped[list["Robot"]] = relationship("Robot", back_populates="owner")
+
+    def __repr__(self) -> str:
+        return f"<User(id={self.id}, email={self.email}, role={self.role})>"
+
+
 class Robot(Base):
     """Модель робота."""
 
@@ -48,12 +82,12 @@ class Robot(Base):
     hostname: Mapped[str] = mapped_column(String(255), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(45))
     architecture: Mapped[Architecture] = mapped_column(
-        Enum(Architecture, name="architecture"),
+        Enum(Architecture, name="architecture", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=Architecture.ARM64,
     )
     status: Mapped[RobotStatus] = mapped_column(
-        Enum(RobotStatus, name="robot_status"),
+        Enum(RobotStatus, name="robot_status", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=RobotStatus.PENDING,
     )
@@ -66,7 +100,9 @@ class Robot(Base):
     )
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    # Связь с кодами привязки
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    owner: Mapped["User | None"] = relationship("User", back_populates="robots")
+
     pair_codes: Mapped[list["PairCode"]] = relationship(
         "PairCode", back_populates="robot", cascade="all, delete-orphan"
     )
@@ -84,7 +120,7 @@ class PairCode(Base):
     code: Mapped[str] = mapped_column(String(8), unique=True, nullable=False, index=True)
     robot_id: Mapped[int] = mapped_column(ForeignKey("robots.id"), nullable=False)
     status: Mapped[PairCodeStatus] = mapped_column(
-        Enum(PairCodeStatus, name="pair_code_status"),
+        Enum(PairCodeStatus, name="pair_code_status", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=PairCodeStatus.PENDING,
     )

@@ -212,6 +212,7 @@ __marimo__/
 
 # Локальные файлы тестирования
 .local_pair_code
+.agent-data/
 /tmp/telegraf-local.conf
 
 # SSL сертификаты (кроме .gitkeep)
@@ -246,3 +247,11 @@ Thumbs.db
 *.log
 logs/
 .local_robot_token
+
+# =============================================================================
+# Frontend (Vue/Node.js)
+# =============================================================================
+node_modules/
+client/dist/
+client/.vite/
+*.local

@@ -101,6 +101,33 @@
   tags:
     - configure
 
+# Ожидание подтверждения привязки (интерактивно)
+- name: Ожидание подтверждения привязки
+  ansible.builtin.uri:
+    url: "{{ monitoring_server_url }}/api/pair/{{ pair_code }}/status"
+    method: GET
+    return_content: true
+  register: pair_status
+  until: pair_status.json.status == 'confirmed'
+  retries: 180
+  delay: 5
+  tags:
+    - configure
+
+- name: Получение токена робота
+  ansible.builtin.set_fact:
+    robot_token: "{{ pair_status.json.robot_token }}"
+  when: pair_status.json.status == 'confirmed'
+  tags:
+    - configure
+
+- name: Проверка получения токена
+  ansible.builtin.fail:
+    msg: "Не удалось получить токен робота. Убедитесь, что привязка подтверждена в веб-интерфейсе."
+  when: robot_token | length == 0
+  tags:
+    - configure
+
 # Настройка Telegraf
 - name: Создание конфигурации Telegraf
   ansible.builtin.template:

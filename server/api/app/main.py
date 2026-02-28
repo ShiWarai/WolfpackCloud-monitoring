@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from app import __version__
 from app.config import get_settings
 from app.database import init_db
-from app.routers import metrics_router, pairing_router, robots_router
+from app.routers import auth_router, metrics_router, pairing_router, robots_router
 from app.schemas import ErrorResponse, HealthResponse
 
 settings = get_settings()
@@ -82,6 +82,7 @@ async def global_exception_handler(_request: Request, _exc: Exception) -> JSONRe
 
 
 # Подключение роутеров
+app.include_router(auth_router)
 app.include_router(metrics_router)
 app.include_router(pairing_router)
 app.include_router(robots_router)

@@ -1,7 +1,7 @@
 """
 API эндпоинты для управления роботами.
 
-CRUD операции над зарегистрированными роботами.
+CRUD операции над зарегистрированными роботами с разграничением доступа по пользователям.
 """
 
 from datetime import UTC, datetime
@@ -11,7 +11,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Robot, RobotStatus
+from app.deps import get_current_user
+from app.models import Robot, RobotStatus, User, UserRole
 from app.schemas import (
     ErrorResponse,
     RobotDetailResponse,
@@ -23,11 +24,18 @@ from app.schemas import (
 router = APIRouter(prefix="/api/robots", tags=["robots"])
 
 
+def can_access_robot(robot: Robot, user: User) -> bool:
+    """Проверяет, имеет ли пользователь доступ к роботу."""
+    if user.role == UserRole.ADMIN:
+        return True
+    return robot.owner_id == user.id
+
+
 @router.get(
     "",
     response_model=RobotListResponse,
     summary="Список роботов",
-    description="Получение списка всех зарегистрированных роботов с пагинацией и фильтрацией.",
+    description="Получение списка роботов текущего пользователя. Админ видит всех роботов.",
 )
 async def list_robots(
     status_filter: RobotStatus | None = Query(
@@ -36,28 +44,28 @@ async def list_robots(
     search: str | None = Query(None, description="Поиск по имени или hostname"),
     skip: int = Query(0, ge=0, description="Пропустить записей"),
     limit: int = Query(50, ge=1, le=100, description="Максимум записей"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> RobotListResponse:
-    """Возвращает список роботов с возможностью фильтрации."""
+    """Возвращает список роботов с фильтрацией по владельцу."""
     query = select(Robot)
 
-    # Фильтрация по статусу
+    if current_user.role != UserRole.ADMIN:
+        query = query.where(Robot.owner_id == current_user.id)
+
     if status_filter:
         query = query.where(Robot.status == status_filter)
 
-    # Поиск по имени или hostname
     if search:
         search_pattern = f"%{search}%"
         query = query.where(
             (Robot.name.ilike(search_pattern)) | (Robot.hostname.ilike(search_pattern))
         )
 
-    # Подсчёт общего количества
     count_query = select(func.count()).select_from(query.subquery())
     total_result = await db.execute(count_query)
     total = total_result.scalar_one()
 
-    # Пагинация и сортировка
     query = query.order_by(Robot.created_at.desc()).offset(skip).limit(limit)
 
     result = await db.execute(query)
@@ -73,6 +81,7 @@ async def list_robots(
     "/{robot_id}",
     response_model=RobotDetailResponse,
     responses={
+        403: {"model": ErrorResponse, "description": "Нет доступа к роботу"},
         404: {"model": ErrorResponse, "description": "Робот не найден"},
     },
     summary="Информация о роботе",
@@ -80,6 +89,7 @@ async def list_robots(
 )
 async def get_robot(
     robot_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> RobotDetailResponse:
     """Возвращает информацию о роботе."""
@@ -92,6 +102,12 @@ async def get_robot(
             detail="Робот не найден",
         )
 
+    if not can_access_robot(robot, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет доступа к этому роботу",
+        )
+
     return RobotDetailResponse.model_validate(robot)
 
 
@@ -99,6 +115,7 @@ async def get_robot(
     "/{robot_id}",
     response_model=RobotResponse,
     responses={
+        403: {"model": ErrorResponse, "description": "Нет доступа к роботу"},
         404: {"model": ErrorResponse, "description": "Робот не найден"},
     },
     summary="Обновление робота",
@@ -107,6 +124,7 @@ async def get_robot(
 async def update_robot(
     robot_id: int,
     update_data: RobotUpdate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> RobotResponse:
     """Обновляет информацию о роботе."""
@@ -119,7 +137,12 @@ async def update_robot(
             detail="Робот не найден",
         )
 
-    # Обновляем только переданные поля
+    if not can_access_robot(robot, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет доступа к этому роботу",
+        )
+
     update_dict = update_data.model_dump(exclude_unset=True)
     for field, value in update_dict.items():
         setattr(robot, field, value)
@@ -135,6 +158,7 @@ async def update_robot(
     "/{robot_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
+        403: {"model": ErrorResponse, "description": "Нет доступа к роботу"},
         404: {"model": ErrorResponse, "description": "Робот не найден"},
     },
     summary="Удаление робота",
@@ -142,6 +166,7 @@ async def update_robot(
 )
 async def delete_robot(
     robot_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     """Удаляет робота."""
@@ -154,6 +179,12 @@ async def delete_robot(
             detail="Робот не найден",
         )
 
+    if not can_access_robot(robot, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет доступа к этому роботу",
+        )
+
     await db.delete(robot)
     await db.commit()
 
@@ -162,6 +193,7 @@ async def delete_robot(
     "/{robot_id}/heartbeat",
     response_model=RobotResponse,
     responses={
+        403: {"model": ErrorResponse, "description": "Нет доступа к роботу"},
         404: {"model": ErrorResponse, "description": "Робот не найден"},
     },
     summary="Heartbeat робота",
@@ -169,6 +201,7 @@ async def delete_robot(
 )
 async def robot_heartbeat(
     robot_id: int,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> RobotResponse:
     """Обновляет время последней активности робота."""
@@ -179,6 +212,12 @@ async def robot_heartbeat(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Робот не найден",
+        )
+
+    if not can_access_robot(robot, current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Нет доступа к этому роботу",
         )
 
     robot.last_seen_at = datetime.now(UTC)
