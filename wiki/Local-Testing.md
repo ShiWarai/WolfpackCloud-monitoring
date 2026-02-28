@@ -5,46 +5,30 @@
 ## Быстрый старт
 
 ```bash
-# Запуск всего стека + локального агента
-./scripts/local-install.sh
+# 1. Запуск серверного стека
+make dev
+
+# 2. Создание виртуального робота
+./scripts/local-install.sh --docker
 ```
 
-Скрипт:
-1. Создаёт `.env` с тестовыми значениями
-2. Запускает Docker Compose стек
-3. Запускает Telegraf в контейнере
-4. Регистрирует тестового робота
-5. Выводит код привязки и URL сервисов
+`local-install.sh` создаёт виртуального робота (Telegraf в контейнере), который:
+1. Регистрируется на сервере
+2. **Автоматически подтверждает привязку** (для удобства тестирования)
+3. Получает персональный токен
+4. Начинает отправлять метрики через `POST /api/metrics`
 
 ## Доступ к сервисам
 
-После запуска:
+После `make dev`:
 
 | Сервис | URL | Учётные данные |
 |--------|-----|----------------|
 | Grafana | http://localhost:3000 | admin / admin |
 | API | http://localhost:8000/docs | — |
 | Superset | http://localhost:8088 | admin / admin |
-| InfluxDB | http://localhost:8086 | admin / testpassword123 |
-| PostgreSQL | localhost:5432 | monitoring / testpassword123 |
-
-## Подтверждение привязки
-
-1. Откройте http://localhost:3000
-2. Войдите как admin/admin
-3. Перейдите в Dashboard → "Роботы — Обзор"
-4. Найдите тестового робота со статусом "Ожидает"
-5. Используйте код из терминала или файла `.local_pair_code`
-
-Или через API:
-
-```bash
-# Получить код
-cat .local_pair_code
-
-# Подтвердить
-curl -X POST "http://localhost:8000/api/pair/$(cat .local_pair_code)/confirm"
-```
+| InfluxDB | http://localhost:8086 | см. .env |
+| PostgreSQL | localhost:5432 | см. .env |
 
 ## Просмотр метрик
 
@@ -89,18 +73,37 @@ curl -X POST http://localhost:8000/api/pair \
 # Информация о коде
 curl http://localhost:8000/api/pair/TEST5678
 
+# Статус привязки (polling)
+curl http://localhost:8000/api/pair/TEST5678/status
+
 # Подтверждение
 curl -X POST http://localhost:8000/api/pair/TEST5678/confirm
+
+# Статус после подтверждения (теперь с токеном)
+curl http://localhost:8000/api/pair/TEST5678/status
 ```
 
 ## Тестирование отправки метрик
 
-Ручная отправка в InfluxDB:
+### Через API (рекомендуемый способ)
 
 ```bash
-# Через curl
+# Получить токен робота
+TOKEN=$(cat .local_robot_token)
+
+# Отправить метрику через API
+curl -X POST "http://localhost:8000/api/metrics" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: text/plain" \
+  --data-binary 'cpu,robot=manual-test,cpu=cpu-total usage_idle=75.5'
+```
+
+### Напрямую в InfluxDB (только для отладки)
+
+```bash
+# Через curl (используйте токен из .env)
 curl -X POST "http://localhost:8086/api/v2/write?org=wolfpackcloud&bucket=robots" \
-  -H "Authorization: Token test-token-for-development-only" \
+  -H "Authorization: Token $(grep INFLUXDB_ADMIN_TOKEN .env | cut -d= -f2)" \
   -H "Content-Type: text/plain" \
   --data-binary 'cpu,robot=manual-test,cpu=cpu-total usage_idle=75.5'
 

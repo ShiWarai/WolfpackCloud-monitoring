@@ -5,10 +5,8 @@
 #   {{ROBOT_NAME}}      - Имя робота
 #   {{HOSTNAME}}        - Hostname устройства
 #   {{ARCH}}            - Архитектура (arm64/amd64)
-#   {{INFLUX_URL}}      - URL InfluxDB сервера
-#   {{INFLUX_TOKEN}}    - Токен авторизации InfluxDB
-#   {{INFLUX_ORG}}      - Организация InfluxDB
-#   {{INFLUX_BUCKET}}   - Bucket InfluxDB
+#   {{API_URL}}         - URL API сервера для отправки метрик
+#   {{ROBOT_TOKEN}}     - Персональный токен робота для авторизации
 
 [global_tags]
   robot = "{{ROBOT_NAME}}"
@@ -50,18 +48,22 @@
 #                            OUTPUT PLUGINS                                   #
 ###############################################################################
 
-# Отправка в InfluxDB 2.x
-[[outputs.influxdb_v2]]
-  urls = ["{{INFLUX_URL}}"]
-  token = "{{INFLUX_TOKEN}}"
-  organization = "{{INFLUX_ORG}}"
-  bucket = "{{INFLUX_BUCKET}}"
+# Отправка метрик через API (проксируется в InfluxDB)
+[[outputs.http]]
+  url = "{{API_URL}}"
+  method = "POST"
+  data_format = "influx"
   
   # Таймаут соединения
-  timeout = "5s"
+  timeout = "10s"
   
   # Сжатие данных
   content_encoding = "gzip"
+  
+  # Заголовки авторизации
+  [outputs.http.headers]
+    Authorization = "Bearer {{ROBOT_TOKEN}}"
+    Content-Type = "text/plain; charset=utf-8"
 
 ###############################################################################
 #                            INPUT PLUGINS                                    #
@@ -157,7 +159,7 @@
 
 # Проверка доступности сети (ping к серверу)
 # [[inputs.ping]]
-#   urls = ["{{INFLUX_URL}}"]
+#   urls = ["{{API_URL}}"]
 #   count = 1
 #   timeout = 2.0
 #   interval = "60s"

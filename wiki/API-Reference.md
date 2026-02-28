@@ -10,7 +10,19 @@ http://localhost:8000
 
 ## Аутентификация
 
-Текущая версия API не требует аутентификации. В production рекомендуется добавить API keys или JWT.
+### Для роботов (отправка метрик)
+
+Эндпоинт `POST /api/metrics` требует заголовок `Authorization`:
+
+```
+Authorization: Bearer {robot_token}
+```
+
+Токен выдаётся роботу после подтверждения привязки через `GET /api/pair/{code}/status`.
+
+### Для пользователей
+
+Остальные эндпоинты не требуют аутентификации. В production рекомендуется добавить API keys или JWT для управления роботами.
 
 ---
 
@@ -119,6 +131,81 @@ http://localhost:8000
 - `400 Bad Request` — код уже подтверждён
 - `404 Not Found` — код не найден
 - `410 Gone` — код истёк
+
+---
+
+### GET /api/pair/{code}/status
+
+Статус привязки (polling). Вызывается агентом после регистрации для получения токена.
+
+**Response (200 OK) — pending:**
+
+```json
+{
+  "status": "pending",
+  "robot_id": 1,
+  "robot_token": null,
+  "api_url": "http://server:8000/api/metrics",
+  "message": "Ожидание подтверждения пользователем."
+}
+```
+
+**Response (200 OK) — confirmed:**
+
+```json
+{
+  "status": "confirmed",
+  "robot_id": 1,
+  "robot_token": "abc123...",
+  "api_url": "http://server:8000/api/metrics",
+  "message": "Привязка подтверждена. Используйте токен для отправки метрик."
+}
+```
+
+**Response (200 OK) — expired:**
+
+```json
+{
+  "status": "expired",
+  "robot_id": null,
+  "robot_token": null,
+  "api_url": "http://server:8000",
+  "message": "Срок действия кода истёк. Зарегистрируйтесь заново."
+}
+```
+
+**Errors:**
+- `404 Not Found` — код не найден
+
+---
+
+## Метрики
+
+### POST /api/metrics
+
+Приём метрик от робота. Метрики проксируются в InfluxDB.
+
+**Headers:**
+
+```
+Authorization: Bearer {robot_token}
+Content-Type: text/plain; charset=utf-8
+```
+
+**Request Body:** InfluxDB Line Protocol
+
+```
+cpu,robot=robot-01,cpu=cpu-total usage_idle=98.5 1709134800000000000
+mem,robot=robot-01 used_percent=45.2 1709134800000000000
+```
+
+**Response:** `204 No Content`
+
+**Errors:**
+- `400 Bad Request` — пустое тело или невалидные данные
+- `401 Unauthorized` — невалидный или отсутствующий токен
+- `403 Forbidden` — робот не активен
+- `502 Bad Gateway` — ошибка записи в InfluxDB
 
 ---
 

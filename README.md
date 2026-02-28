@@ -8,8 +8,7 @@
 
 ## Быстрый старт
 
-### Сервер
-
+**Сервер:**
 ```bash
 git clone https://github.com/ShiWarai/WolfpackCloud-monitoring.git
 cd WolfpackCloud-monitoring
@@ -17,34 +16,23 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Grafana: http://localhost:3000 (admin / admin)
-
-### Робот
-
+**Робот:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/main/agent/install.sh | sudo bash -s -- --server YOUR_SERVER_URL
+curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/main/agent/install.sh | sudo bash -s -- --server https://YOUR_SERVER_URL
 ```
 
-Введите 8-значный код в Grafana для привязки.
+После установки введите 8-значный код в Grafana (http://localhost:3000) для привязки робота.
 
 ## Стек
 
-| Компонент | Технология |
-|-----------|------------|
-| Агент | Telegraf |
-| Метрики | InfluxDB 2.x |
-| Дашборды | Grafana |
-| API | FastAPI |
-| БД | PostgreSQL |
+Telegraf → FastAPI → InfluxDB → Grafana
 
 ## Документация
-
-Подробная документация в [Wiki](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki):
 
 - [Архитектура](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Architecture)
 - [Установка агента](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Installation)
 - [Настройка сервера](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Server-Setup)
-- [CI/CD](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/CI-CD)
+- [Локальное тестирование](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Local-Testing)
 - [API Reference](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/API-Reference)
 
 ## Лицензия

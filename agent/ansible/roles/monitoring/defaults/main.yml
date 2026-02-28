@@ -18,9 +18,8 @@ telegraf_interval: "10s"
 # Интервал отправки метрик
 telegraf_flush_interval: "10s"
 
-# InfluxDB настройки (заполняются после регистрации)
-influxdb_org: "wolfpackcloud"
-influxdb_bucket: "robots"
+# Токен робота (получается после подтверждения привязки)
+robot_token: ""
 
 # Дополнительные input плагины (можно переопределить для каждого хоста)
 telegraf_extra_inputs: ""

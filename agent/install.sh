@@ -166,22 +166,84 @@ register_robot() {
             \"pair_code\": \"${pair_code}\"
         }" 2>&1) || log_error "Не удалось связаться с сервером: $response"
     
-    # Извлекаем токен InfluxDB из ответа
-    local influx_token
-    influx_token=$(echo "$response" | grep -oP '"influxdb_token":\s*"\K[^"]+' || echo "")
+    log_success "Робот зарегистрирован. Ожидание подтверждения..."
+}
+
+# Ожидание подтверждения привязки (polling)
+wait_for_confirmation() {
+    local pair_code="$1"
+    local timeout_seconds=900  # 15 минут
+    local poll_interval=5
+    local elapsed=0
     
-    if [ -z "$influx_token" ]; then
-        log_warn "Токен InfluxDB не получен. Робот будет ожидать подтверждения."
-        echo ""
-    else
-        echo "$influx_token"
-    fi
+    log_info "Ожидание подтверждения привязки..."
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                  ║"
+    echo "║   Для привязки робота введите код в панели управления:           ║"
+    echo "║                                                                  ║"
+    echo "║              ┌──────────────────┐                                ║"
+    echo "║              │    ${pair_code}        │                                ║"
+    echo "║              └──────────────────┘                                ║"
+    echo "║                                                                  ║"
+    echo "║   Панель управления: ${SERVER_URL}                               "
+    echo "║   Код действителен 15 минут.                                     ║"
+    echo "║                                                                  ║"
+    echo "╚══════════════════════════════════════════════════════════════════╝"
+    echo ""
+    
+    while [ $elapsed -lt $timeout_seconds ]; do
+        local response
+        response=$(curl -sfL "${SERVER_URL}/api/pair/${pair_code}/status" 2>/dev/null || echo "")
+        
+        if [ -z "$response" ]; then
+            log_warn "Не удалось связаться с сервером. Повторная попытка..."
+            sleep $poll_interval
+            elapsed=$((elapsed + poll_interval))
+            continue
+        fi
+        
+        local status
+        status=$(echo "$response" | grep -oP '"status":\s*"\K[^"]+' || echo "pending")
+        
+        case "$status" in
+            confirmed)
+                local robot_token
+                local api_url
+                robot_token=$(echo "$response" | grep -oP '"robot_token":\s*"\K[^"]+' || echo "")
+                api_url=$(echo "$response" | grep -oP '"api_url":\s*"\K[^"]+' || echo "${SERVER_URL}/api/metrics")
+                
+                if [ -n "$robot_token" ]; then
+                    log_success "Привязка подтверждена!"
+                    # Возвращаем токен и URL через глобальные переменные
+                    ROBOT_TOKEN="$robot_token"
+                    API_URL="$api_url"
+                    return 0
+                else
+                    log_error "Токен не получен после подтверждения"
+                fi
+                ;;
+            expired)
+                log_error "Срок действия кода привязки истёк. Запустите установку заново."
+                ;;
+            pending)
+                echo -n "."
+                ;;
+        esac
+        
+        sleep $poll_interval
+        elapsed=$((elapsed + poll_interval))
+    done
+    
+    echo ""
+    log_error "Время ожидания подтверждения истекло. Запустите установку заново."
 }
 
 # Настройка Telegraf
 configure_telegraf() {
-    local influx_token="$1"
-    local robot_name="$2"
+    local robot_token="$1"
+    local api_url="$2"
+    local robot_name="$3"
     
     log_info "Настройка Telegraf..."
     
@@ -190,13 +252,7 @@ configure_telegraf() {
         cp "$TELEGRAF_CONF_FILE" "${TELEGRAF_CONF_FILE}.backup.$(date +%Y%m%d%H%M%S)"
     fi
     
-    # Определяем URL для InfluxDB (всегда порт 8086)
-    # Удаляем существующий порт (если есть) и добавляем :8086
-    local server_base
-    server_base=$(echo "$SERVER_URL" | sed -E 's|(https?://[^/:]+)(:[0-9]+)?.*|\1|')
-    local influx_url="${server_base}:8086"
-    
-    # Создаём конфигурацию из шаблона
+    # Создаём конфигурацию
     cat > "$TELEGRAF_CONF_FILE" << EOF
 # Конфигурация Telegraf для WolfpackCloud Monitoring
 # Сгенерировано автоматически: $(date -Iseconds)
@@ -223,12 +279,17 @@ configure_telegraf() {
 #                            OUTPUT PLUGINS                                   #
 ###############################################################################
 
-[[outputs.influxdb_v2]]
-  urls = ["${influx_url}"]
-  token = "${influx_token}"
-  organization = "wolfpackcloud"
-  bucket = "robots"
-  timeout = "5s"
+# Отправка метрик через API (проксируется в InfluxDB)
+[[outputs.http]]
+  url = "${api_url}"
+  method = "POST"
+  data_format = "influx"
+  timeout = "10s"
+  content_encoding = "gzip"
+  
+  [outputs.http.headers]
+    Authorization = "Bearer ${robot_token}"
+    Content-Type = "text/plain; charset=utf-8"
 
 ###############################################################################
 #                            INPUT PLUGINS                                    #
@@ -315,27 +376,21 @@ start_telegraf() {
     fi
 }
 
-# Показать информацию о привязке
-show_pairing_info() {
-    local pair_code="$1"
+# Показать информацию об успешной установке
+show_success_info() {
+    local robot_name="$1"
     
     echo ""
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║                                                                  ║"
     echo "║   WolfpackCloud Monitoring Agent установлен успешно!             ║"
     echo "║                                                                  ║"
-    echo "║   Для привязки робота к панели мониторинга:                      ║"
+    echo "║   Робот: ${robot_name}                                           "
+    echo "║   Сервер: ${SERVER_URL}                                          "
     echo "║                                                                  ║"
-    echo "║   1. Откройте панель Grafana: ${SERVER_URL}                      "
-    echo "║   2. Перейдите в Dashboard → 'Роботы'                            ║"
-    echo "║   3. Нажмите 'Добавить робота'                                   ║"
-    echo "║   4. Введите код привязки:                                       ║"
-    echo "║                                                                  ║"
-    echo "║              ┌──────────────────┐                                ║"
-    echo "║              │    ${pair_code}        │                                ║"
-    echo "║              └──────────────────┘                                ║"
-    echo "║                                                                  ║"
-    echo "║   Код действителен 15 минут.                                     ║"
+    echo "║   Метрики отправляются через API.                                ║"
+    echo "║   Проверить статус: systemctl status telegraf                    ║"
+    echo "║   Логи: journalctl -u telegraf -f                                ║"
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
@@ -376,6 +431,10 @@ parse_args() {
     SERVER_URL="${SERVER_URL%/}"
 }
 
+# Глобальные переменные для токена (заполняются после подтверждения)
+ROBOT_TOKEN=""
+API_URL=""
+
 # Главная функция
 main() {
     echo ""
@@ -402,27 +461,26 @@ main() {
     install_telegraf
     
     # Регистрация на сервере
-    local influx_token
-    influx_token=$(register_robot "$pair_code")
+    register_robot "$pair_code"
     
-    # Если токен не получен, используем временный (будет обновлён после подтверждения)
-    if [ -z "$influx_token" ]; then
-        influx_token="pending_${pair_code}"
-    fi
+    # Ожидание подтверждения (polling)
+    wait_for_confirmation "$pair_code"
     
-    # Настройка Telegraf
+    # После подтверждения ROBOT_TOKEN и API_URL заполнены
     local robot_name="${ROBOT_NAME:-$(get_hostname)}"
-    configure_telegraf "$influx_token" "$robot_name"
+    
+    # Настройка Telegraf с полученным токеном
+    configure_telegraf "$ROBOT_TOKEN" "$API_URL" "$robot_name"
     
     # Запуск Telegraf
     start_telegraf
     
-    # Показываем информацию о привязке
-    show_pairing_info "$pair_code"
+    # Показываем информацию об успешной установке
+    show_success_info "$robot_name"
     
-    # Сохраняем код привязки для возможного повторного использования
-    echo "$pair_code" > /etc/telegraf/.pair_code
-    chmod 600 /etc/telegraf/.pair_code
+    # Сохраняем токен для возможного повторного использования
+    echo "$ROBOT_TOKEN" > /etc/telegraf/.robot_token
+    chmod 600 /etc/telegraf/.robot_token
 }
 
 main "$@"

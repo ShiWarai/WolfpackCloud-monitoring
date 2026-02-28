@@ -193,3 +193,87 @@ async def test_delete_robot(client: AsyncClient):
     # Проверка удаления
     get_response = await client.get(f"/api/robots/{robot_id}")
     assert get_response.status_code == status.HTTP_404_NOT_FOUND
+
+
+# =============================================================================
+# Тесты для GET /api/pair/{code}/status (polling)
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_pair_status_pending(client: AsyncClient):
+    """Статус pending до подтверждения."""
+    pair_code = "STAT1234"
+
+    # Регистрация
+    await client.post(
+        "/api/pair",
+        json={
+            "hostname": "test-status-pending",
+            "pair_code": pair_code,
+        },
+    )
+
+    # Проверка статуса
+    response = await client.get(f"/api/pair/{pair_code}/status")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["status"] == "pending"
+    assert data["robot_token"] is None
+    assert "api_url" in data
+    assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_pair_status_confirmed_returns_token(client: AsyncClient):
+    """После confirm возвращает токен."""
+    pair_code = "STOK1234"
+
+    # Регистрация
+    await client.post(
+        "/api/pair",
+        json={
+            "hostname": "test-status-token",
+            "pair_code": pair_code,
+        },
+    )
+
+    # Подтверждение
+    await client.post(f"/api/pair/{pair_code}/confirm")
+
+    # Проверка статуса
+    response = await client.get(f"/api/pair/{pair_code}/status")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["status"] == "confirmed"
+    assert data["robot_token"] is not None
+    assert data["robot_id"] is not None
+    assert "/api/metrics" in data["api_url"]
+
+
+@pytest.mark.asyncio
+async def test_pair_status_not_found(client: AsyncClient):
+    """404 для несуществующего кода."""
+    response = await client.get("/api/pair/NOTFND00/status")
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_pair_status_case_insensitive(client: AsyncClient):
+    """Код работает в любом регистре."""
+    pair_code = "CASE1234"
+
+    # Регистрация
+    await client.post(
+        "/api/pair",
+        json={
+            "hostname": "test-status-case",
+            "pair_code": pair_code,
+        },
+    )
+
+    # Проверка статуса с lowercase
+    response = await client.get(f"/api/pair/{pair_code.lower()}/status")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["status"] == "pending"

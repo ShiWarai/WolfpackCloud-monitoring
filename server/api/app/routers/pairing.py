@@ -22,6 +22,7 @@ from app.schemas import (
     PairConfirmResponse,
     PairRequest,
     PairResponse,
+    PairStatusResponse,
 )
 
 router = APIRouter(prefix="/api/pair", tags=["pairing"])
@@ -131,6 +132,73 @@ async def get_pair_code_info(
         await db.commit()
 
     return PairCodeInfoResponse.model_validate(pair_code)
+
+
+@router.get(
+    "/{code}/status",
+    response_model=PairStatusResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Код не найден"},
+    },
+    summary="Статус привязки (для polling)",
+    description="""
+Возвращает статус привязки. Используется агентом для polling после регистрации.
+
+После подтверждения привязки возвращает токен для отправки метрик.
+    """,
+)
+async def get_pair_status(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+) -> PairStatusResponse:
+    """
+    Возвращает статус привязки для агента.
+    
+    Агент вызывает этот эндпоинт периодически после регистрации,
+    чтобы узнать, подтверждена ли привязка и получить токен.
+    """
+    result = await db.execute(
+        select(PairCode).options(selectinload(PairCode.robot)).where(PairCode.code == code.upper())
+    )
+    pair_code = result.scalar_one_or_none()
+
+    if not pair_code:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Код привязки не найден",
+        )
+
+    # Проверяем истечение срока
+    if pair_code.status == PairCodeStatus.PENDING and pair_code.expires_at < datetime.now(UTC):
+        pair_code.status = PairCodeStatus.EXPIRED
+        await db.commit()
+
+    robot = pair_code.robot
+    
+    if pair_code.status == PairCodeStatus.CONFIRMED:
+        return PairStatusResponse(
+            status=pair_code.status,
+            robot_id=robot.id,
+            robot_token=robot.influxdb_token,
+            api_url=f"{settings.api_base_url}/api/metrics",
+            message="Привязка подтверждена. Используйте токен для отправки метрик.",
+        )
+    elif pair_code.status == PairCodeStatus.EXPIRED:
+        return PairStatusResponse(
+            status=pair_code.status,
+            robot_id=None,
+            robot_token=None,
+            api_url=settings.api_base_url,
+            message="Срок действия кода истёк. Зарегистрируйтесь заново.",
+        )
+    else:
+        return PairStatusResponse(
+            status=pair_code.status,
+            robot_id=robot.id,
+            robot_token=None,
+            api_url=settings.api_base_url,
+            message="Ожидание подтверждения пользователем.",
+        )
 
 
 @router.post(

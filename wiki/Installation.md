@@ -28,9 +28,11 @@ curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/m
 1. **Определяет систему** — архитектуру и дистрибутив
 2. **Устанавливает Telegraf** — через пакетный менеджер (apt/dnf/pacman)
 3. **Генерирует код привязки** — уникальный 8-значный код
-4. **Регистрирует робота** — отправляет данные на сервер
-5. **Настраивает Telegraf** — создаёт конфигурацию для сбора метрик
-6. **Запускает сервис** — включает и запускает Telegraf
+4. **Регистрирует робота** — отправляет данные на сервер (`POST /api/pair`)
+5. **Ожидает подтверждения** — опрашивает сервер каждые 5 секунд (`GET /api/pair/{code}/status`)
+6. **Получает токен** — после подтверждения пользователем получает персональный токен
+7. **Настраивает Telegraf** — создаёт конфигурацию с токеном для отправки метрик через API
+8. **Запускает сервис** — включает и запускает Telegraf
 
 ## Код привязки
 
@@ -91,11 +93,16 @@ sudo apt install telegraf
   interval = "10s"
   flush_interval = "10s"
 
-[[outputs.influxdb_v2]]
-  urls = ["https://monitoring.example.com:8086"]
-  token = "YOUR_TOKEN"
-  organization = "wolfpackcloud"
-  bucket = "robots"
+# Отправка метрик через API (не напрямую в InfluxDB)
+[[outputs.http]]
+  url = "https://monitoring.example.com/api/metrics"
+  method = "POST"
+  data_format = "influx"
+  timeout = "10s"
+  
+  [outputs.http.headers]
+    Authorization = "Bearer YOUR_ROBOT_TOKEN"
+    Content-Type = "text/plain; charset=utf-8"
 
 [[inputs.cpu]]
   percpu = true
@@ -112,6 +119,8 @@ sudo apt install telegraf
 
 [[inputs.temp]]
 ```
+
+**Важно**: `YOUR_ROBOT_TOKEN` — персональный токен, который робот получает после подтверждения привязки.
 
 ### 3. Запуск
 

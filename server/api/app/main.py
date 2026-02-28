@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from app import __version__
 from app.config import get_settings
 from app.database import init_db
-from app.routers import pairing_router, robots_router
+from app.routers import metrics_router, pairing_router, robots_router
 from app.schemas import ErrorResponse, HealthResponse
 
 settings = get_settings()
@@ -48,7 +48,8 @@ API для привязки и управления роботами в сист
 2. Агент вызывает `POST /api/pair` с кодом и информацией о системе
 3. Пользователь вводит код в панели управления (Grafana)
 4. Панель вызывает `POST /api/pair/{code}/confirm`
-5. Робот получает токен InfluxDB и начинает отправку метрик
+5. Робот опрашивает `GET /api/pair/{code}/status` и получает токен
+6. Робот отправляет метрики через `POST /api/metrics` с токеном
     """,
     version=__version__,
     docs_url="/docs",
@@ -81,6 +82,7 @@ async def global_exception_handler(_request: Request, _exc: Exception) -> JSONRe
 
 
 # Подключение роутеров
+app.include_router(metrics_router)
 app.include_router(pairing_router)
 app.include_router(robots_router)
 

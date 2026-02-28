@@ -25,13 +25,17 @@
 #                            OUTPUT PLUGINS                                   #
 ###############################################################################
 
-[[outputs.influxdb_v2]]
-  urls = ["{{ monitoring_server_url | regex_replace(':\\d+$', '') }}:8086"]
-  token = "pending_{{ pair_code }}"
-  organization = "{{ influxdb_org }}"
-  bucket = "{{ influxdb_bucket }}"
-  timeout = "5s"
+# Отправка метрик через API (проксируется в InfluxDB)
+[[outputs.http]]
+  url = "{{ monitoring_server_url }}/api/metrics"
+  method = "POST"
+  data_format = "influx"
+  timeout = "10s"
   content_encoding = "gzip"
+  
+  [outputs.http.headers]
+    Authorization = "Bearer {{ robot_token }}"
+    Content-Type = "text/plain; charset=utf-8"
 
 ###############################################################################
 #                            INPUT PLUGINS                                    #

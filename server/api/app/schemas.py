@@ -136,6 +136,18 @@ class PairCodeInfoResponse(BaseModel):
     robot: RobotResponse | None = None
 
 
+class PairStatusResponse(BaseModel):
+    """Статус привязки для polling агентом."""
+
+    status: PairCodeStatus
+    robot_id: int | None = None
+    robot_token: str | None = Field(
+        None, description="Токен для отправки метрик (только после подтверждения)"
+    )
+    api_url: str = Field(..., description="URL API для отправки метрик")
+    message: str
+
+
 # =============================================================================
 # Общие схемы
 # =============================================================================

@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# WolfpackCloud Monitoring — Локальная установка для тестирования
+# WolfpackCloud Monitoring — Эмуляция робота-клиента для тестирования
 # 
-# Этот скрипт:
-# 1. Запускает серверный стек (Docker Compose)
-# 2. Устанавливает Telegraf локально или в контейнере
-# 3. Регистрирует "локального робота" для тестирования
+# Этот скрипт создаёт виртуального робота (Telegraf в контейнере),
+# который отправляет метрики на локальный сервер мониторинга.
+#
+# Предварительно нужно запустить сервер: make dev
 #
 # Использование:
 #   ./scripts/local-install.sh [--docker | --native]
@@ -36,78 +36,20 @@ log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
 
-# Проверка зависимостей
-check_dependencies() {
-    log_info "Проверка зависимостей..."
+# Проверка что сервер запущен
+check_server_running() {
+    log_info "Проверка что сервер запущен..."
     
-    if ! command -v docker &> /dev/null; then
-        log_error "Docker не установлен. Установите Docker: https://docs.docker.com/get-docker/"
+    if ! curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+        log_error "Сервер не запущен. Сначала выполните: make dev"
     fi
     
-    if ! command -v docker compose &> /dev/null && ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose не установлен"
-    fi
-    
-    log_success "Все зависимости установлены"
-}
-
-# Создание .env файла если не существует
-ensure_env_file() {
-    if [ ! -f "$PROJECT_DIR/.env" ]; then
-        log_info "Создание .env файла из шаблона..."
-        
-        if [ -f "$PROJECT_DIR/.env.example" ]; then
-            cp "$PROJECT_DIR/.env.example" "$PROJECT_DIR/.env"
-            
-            # Генерируем случайные пароли для тестирования
-            sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=testpassword123/" "$PROJECT_DIR/.env"
-            sed -i "s/INFLUXDB_ADMIN_PASSWORD=.*/INFLUXDB_ADMIN_PASSWORD=testpassword123/" "$PROJECT_DIR/.env"
-            sed -i "s/INFLUXDB_ADMIN_TOKEN=.*/INFLUXDB_ADMIN_TOKEN=test-token-for-development-only/" "$PROJECT_DIR/.env"
-            sed -i "s/SECRET_KEY=.*/SECRET_KEY=test-secret-key-change-in-production/" "$PROJECT_DIR/.env"
-            sed -i "s/SUPERSET_SECRET_KEY=.*/SUPERSET_SECRET_KEY=superset-test-secret-key/" "$PROJECT_DIR/.env"
-            
-            log_success ".env файл создан с тестовыми значениями"
-        else
-            log_error ".env.example не найден"
-        fi
-    else
-        log_info ".env файл уже существует"
-    fi
-}
-
-# Запуск серверного стека
-start_server_stack() {
-    log_info "Запуск серверного стека Docker Compose..."
-    
-    cd "$PROJECT_DIR"
-    
-    # Используем dev-конфигурацию для прямого доступа к портам
-    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
-    
-    log_info "Ожидание готовности сервисов..."
-    
-    # Ожидаем готовности API
-    local retries=30
-    while [ $retries -gt 0 ]; do
-        if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
-            break
-        fi
-        retries=$((retries - 1))
-        echo -n "."
-        sleep 2
-    done
-    echo ""
-    
-    if [ $retries -eq 0 ]; then
-        log_error "Сервисы не запустились. Проверьте логи: docker compose logs"
-    fi
-    
-    log_success "Серверный стек запущен"
+    log_success "Сервер доступен"
 }
 
 # Генерация кода привязки
 generate_pair_code() {
-    tr -dc 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' < /dev/urandom | head -c 8
+    head -c 100 /dev/urandom | tr -dc 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' | head -c 8
 }
 
 # Установка Telegraf в Docker
@@ -133,7 +75,25 @@ install_telegraf_docker() {
     
     log_success "Робот зарегистрирован"
     
-    # Создаём временную конфигурацию Telegraf
+    # Автоматическое подтверждение привязки для тестирования
+    log_info "Автоподтверждение привязки..."
+    response=$(curl -sf -X POST "http://localhost:8000/api/pair/${pair_code}/confirm" \
+        -H "Content-Type: application/json") || log_error "Не удалось подтвердить привязку"
+    
+    # Получаем токен из ответа status
+    local status_response
+    status_response=$(curl -sf "http://localhost:8000/api/pair/${pair_code}/status") || log_error "Не удалось получить статус"
+    
+    local robot_token
+    robot_token=$(echo "$status_response" | grep -oP '"robot_token":\s*"\K[^"]+' || echo "")
+    
+    if [ -z "$robot_token" ]; then
+        log_error "Не удалось получить токен робота"
+    fi
+    
+    log_success "Привязка подтверждена, токен получен"
+    
+    # Создаём конфигурацию Telegraf с HTTP output (через API)
     local telegraf_config="/tmp/telegraf-local.conf"
     cat > "$telegraf_config" << EOF
 [global_tags]
@@ -148,11 +108,16 @@ install_telegraf_docker() {
   metric_buffer_limit = 10000
   flush_interval = "10s"
 
-[[outputs.influxdb_v2]]
-  urls = ["http://influxdb:8086"]
-  token = "test-token-for-development-only"
-  organization = "wolfpackcloud"
-  bucket = "robots"
+# Отправка метрик через API
+[[outputs.http]]
+  url = "http://api:8000/api/metrics"
+  method = "POST"
+  data_format = "influx"
+  timeout = "10s"
+  
+  [outputs.http.headers]
+    Authorization = "Bearer ${robot_token}"
+    Content-Type = "text/plain; charset=utf-8"
 
 [[inputs.cpu]]
   percpu = true
@@ -173,17 +138,27 @@ install_telegraf_docker() {
   collect_memstats = false
 EOF
 
+    # Удаляем старый контейнер если есть
+    docker rm -f wpc-telegraf-local 2>/dev/null || true
+    
+    # Определяем имя сети (зависит от имени директории проекта)
+    local network_name
+    network_name=$(docker network ls --format '{{.Name}}' | grep -E '_monitoring$' | head -1)
+    if [ -z "$network_name" ]; then
+        network_name="wolfpackcloud-monitoring_monitoring"
+    fi
+    
     # Запускаем Telegraf в контейнере
     docker run -d \
         --name wpc-telegraf-local \
-        --network wpc-monitoring_monitoring \
+        --network "$network_name" \
         -v "$telegraf_config:/etc/telegraf/telegraf.conf:ro" \
         telegraf:1.32-alpine
     
     log_success "Telegraf запущен в контейнере"
     
-    # Сохраняем код привязки
-    echo "$pair_code" > "$PROJECT_DIR/.local_pair_code"
+    # Сохраняем токен
+    echo "$robot_token" > "$PROJECT_DIR/.local_robot_token"
     
     show_success_message "$pair_code"
 }
@@ -203,31 +178,19 @@ show_success_message() {
     echo ""
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║                                                                  ║"
-    echo "║   WolfpackCloud Monitoring — Локальная установка завершена!      ║"
+    echo "║   Виртуальный робот создан!                                      ║"
     echo "║                                                                  ║"
     echo "╠══════════════════════════════════════════════════════════════════╣"
     echo "║                                                                  ║"
-    echo "║   Доступные сервисы:                                             ║"
+    echo "║   Робот: local-test-robot                                        ║"
+    echo "║   Код привязки: ${pair_code}                                     "
     echo "║                                                                  ║"
-    echo "║   • Grafana:    http://localhost:3000  (admin / admin)           ║"
-    echo "║   • API:        http://localhost:8000/docs                       ║"
-    echo "║   • Superset:   http://localhost:8088  (admin / admin)           ║"
-    echo "║   • InfluxDB:   http://localhost:8086                            ║"
-    echo "║   • PostgreSQL: localhost:5432                                   ║"
+    echo "║   Метрики отправляются через API (POST /api/metrics).            ║"
     echo "║                                                                  ║"
-    echo "╠══════════════════════════════════════════════════════════════════╣"
-    echo "║                                                                  ║"
-    echo "║   Код привязки тестового робота:                                 ║"
-    echo "║                                                                  ║"
-    echo "║              ┌──────────────────┐                                ║"
-    echo "║              │    ${pair_code}        │                                ║"
-    echo "║              └──────────────────┘                                ║"
-    echo "║                                                                  ║"
-    echo "║   Для подтверждения привязки откройте Grafana и введите код.     ║"
-    echo "║                                                                  ║"
-    echo "╠══════════════════════════════════════════════════════════════════╣"
-    echo "║                                                                  ║"
-    echo "║   Для удаления: ./scripts/local-uninstall.sh                     ║"
+    echo "║   Команды:                                                       ║"
+    echo "║     Логи:     docker logs -f wpc-telegraf-local                  ║"
+    echo "║     Стоп:     docker stop wpc-telegraf-local                     ║"
+    echo "║     Удалить:  docker rm -f wpc-telegraf-local                    ║"
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
@@ -264,14 +227,12 @@ parse_args() {
 main() {
     echo ""
     echo "╔══════════════════════════════════════════════════════════════════╗"
-    echo "║   WolfpackCloud Monitoring — Локальная установка для тестов      ║"
+    echo "║   WolfpackCloud Monitoring — Эмуляция робота-клиента             ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
     
     parse_args "$@"
-    check_dependencies
-    ensure_env_file
-    start_server_stack
+    check_server_running
     
     if [ "$INSTALL_MODE" = "docker" ]; then
         install_telegraf_docker
