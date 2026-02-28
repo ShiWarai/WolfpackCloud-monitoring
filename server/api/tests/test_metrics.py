@@ -51,7 +51,7 @@ async def inactive_robot_token(client: AsyncClient) -> str:
     """Создаёт неактивного робота (pending) и возвращает временный идентификатор."""
     pair_code = "INAC1234"
 
-    reg_response = await client.post(
+    await client.post(
         "/api/pair",
         json={
             "hostname": "test-robot-inactive",
@@ -62,7 +62,7 @@ async def inactive_robot_token(client: AsyncClient) -> str:
 
 
 @pytest.mark.asyncio
-async def test_metrics_valid_token(client: AsyncClient, active_robot_token: str, mock_influxdb):
+async def test_metrics_valid_token(client: AsyncClient, active_robot_token: str, mock_influxdb):  # noqa: ARG001
     """Метрики принимаются с валидным токеном."""
     metrics_data = "cpu_usage,robot=test value=50.0 1234567890000000000"
 
@@ -158,7 +158,7 @@ async def test_metrics_malformed_auth_header(client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_metrics_empty_body(client: AsyncClient, active_robot_token: str, mock_influxdb):
+async def test_metrics_empty_body(client: AsyncClient, active_robot_token: str, mock_influxdb):  # noqa: ARG001
     """400 при пустом теле запроса."""
     response = await client.post(
         "/api/metrics",
@@ -173,7 +173,7 @@ async def test_metrics_empty_body(client: AsyncClient, active_robot_token: str, 
 
 
 @pytest.mark.asyncio
-async def test_metrics_updates_last_seen(client: AsyncClient, mock_influxdb):
+async def test_metrics_updates_last_seen(client: AsyncClient, mock_influxdb):  # noqa: ARG001
     """Проверка обновления last_seen_at робота после отправки метрик."""
     pair_code = "SEEN1234"
 
@@ -210,7 +210,7 @@ async def test_metrics_updates_last_seen(client: AsyncClient, mock_influxdb):
 
 
 @pytest.mark.asyncio
-async def test_metrics_multiple_lines(client: AsyncClient, active_robot_token: str, mock_influxdb):
+async def test_metrics_multiple_lines(client: AsyncClient, active_robot_token: str, mock_influxdb):  # noqa: ARG001
     """Метрики принимаются с несколькими строками данных."""
     metrics_data = """cpu_usage,robot=test,cpu=cpu0 value=50.0 1234567890000000000
 cpu_usage,robot=test,cpu=cpu1 value=60.0 1234567890000000000

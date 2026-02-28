@@ -28,7 +28,7 @@ async def get_robot_by_token(
 ) -> Robot:
     """
     Извлекает робота по токену из заголовка Authorization.
-    
+
     Raises:
         HTTPException: 401 если токен невалидный, 403 если робот не активен
     """
@@ -90,7 +90,7 @@ async def receive_metrics(
 ) -> Response:
     """
     Принимает метрики от робота и записывает в InfluxDB.
-    
+
     1. Валидирует токен робота
     2. Читает тело запроса (InfluxDB Line Protocol)
     3. Распаковывает gzip если нужно
