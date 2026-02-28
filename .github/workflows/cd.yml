@@ -1,4 +1,4 @@
-name: "Деплой на Production"
+name: Деплой на Production
 
 on:
   # Запуск после успешного CI на main
@@ -116,9 +116,9 @@ jobs:
             # Перезапуск
             docker compose up -d --remove-orphans
 
-            # Проверка health
+            # Проверка health (API на порту 9100)
             sleep 30
-            curl -f http://localhost:8000/health || exit 1
+            curl -f http://localhost:9100/health || exit 1
 
             # Очистка старых образов
             docker image prune -f
@@ -144,7 +144,7 @@ jobs:
           format: markdown
           disable_notification: true
           message: |
-            *Деплой успешен*
+            ✅ *Деплой успешен*
             Репо: `${{ github.repository }}`
             Ветка: `${{ github.ref_name }}`
             Версия: `${{ needs.build-and-push.outputs.version }}`
@@ -165,7 +165,7 @@ jobs:
           token: ${{ secrets.TELEGRAM_TOKEN }}
           format: markdown
           message: |
-            *Деплой упал*
+            ❌ *Деплой упал*
             Репо: `${{ github.repository }}`
             Ветка: `${{ github.ref_name }}`
             [Открыть run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
