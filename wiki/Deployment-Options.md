@@ -180,10 +180,11 @@ fly deploy
 
 ### Требуемые GitHub Secrets:
 
-| Окружение | Секреты |
-|-----------|---------|
-| Development | `DEV_HOST`, `DEV_USER`, `DEV_SSH_KEY` |
-| Production | `PRODUCTION_HOST`, `PRODUCTION_USER`, `PRODUCTION_SSH_KEY` |
+| Секрет | Описание |
+|--------|----------|
+| `PRODUCTION_HOST` | IP или домен сервера |
+| `PRODUCTION_USER` | SSH пользователь |
+| `PRODUCTION_SSH_KEY` | Приватный SSH ключ |
 
 ### Настройка секретов:
 
@@ -230,14 +231,13 @@ cat ~/.ssh/github-actions
 
 ## 5. Рекомендуемая стратегия
 
-### Для разработки (dev ветка):
+### Для разработки:
 - **GitHub Actions** — автоматические тесты при каждом пуше
 - **GitHub Codespaces** — для ручной разработки и отладки
-- Автодеплой на development-сервер (опционально)
 
 ### Для production (main ветка или теги v*):
-- **Собственный сервер** с ручным подтверждением деплоя
-- GitHub Environments с required reviewers
+- **Собственный сервер** с автоматическим деплоем
+- GitHub Environments с required reviewers (опционально)
 
 ### Пример workflow:
 
@@ -246,22 +246,20 @@ feature/* → dev (PR)
     ↓
   CI: lint, test, build
     ↓
-  Deploy: development (авто)
-    ↓
 dev → main (PR)
     ↓
-  Deploy: production (авто или manual approval)
+  CD: build, deploy production
 ```
 
 ---
 
 ## Настройка GitHub Environments
 
-Для защиты production:
+Для защиты production (опционально):
 
 1. Settings → Environments → New environment
-2. Создайте: `development`, `production`
-3. Для `production`:
+2. Создайте `production`
+3. Настройте:
    - Required reviewers: добавьте себя
    - Wait timer: 5 минут (опционально)
    - Deployment branches: только `main` и теги

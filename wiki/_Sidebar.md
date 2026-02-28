@@ -7,8 +7,10 @@
 ### Установка
 - [[Installation]]
 - [[Server-Setup]]
-- [[Deployment-Options]]
 - [[Local-Testing]]
+
+### CI/CD
+- [[CI-CD]]
 
 ### Справочник
 - [[API-Reference]]
@@ -19,6 +21,4 @@
 
 ---
 
-### Ссылки
-- [GitHub](https://github.com/ShiWarai/WolfpackCloud-monitoring)
-- [WolfpackCloud](https://github.com/ShiWarai/WolfpackCloud)
+[GitHub](https://github.com/ShiWarai/WolfpackCloud-monitoring)
