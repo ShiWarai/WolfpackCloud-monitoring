@@ -174,7 +174,7 @@ async def get_pair_status(
         await db.commit()
 
     robot = pair_code.robot
-    
+
     if pair_code.status == PairCodeStatus.CONFIRMED:
         return PairStatusResponse(
             status=pair_code.status,

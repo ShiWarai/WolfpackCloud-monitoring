@@ -37,32 +37,32 @@ async def get_robot_by_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Неверный формат заголовка Authorization. Ожидается: Bearer {token}",
         )
-    
+
     token = authorization[7:]
-    
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Токен не указан",
         )
-    
+
     result = await db.execute(
         select(Robot).where(Robot.influxdb_token == token)
     )
     robot = result.scalar_one_or_none()
-    
+
     if not robot:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Невалидный токен",
         )
-    
+
     if robot.status != RobotStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Робот не активен. Текущий статус: {robot.status}",
         )
-    
+
     return robot
 
 
@@ -98,13 +98,13 @@ async def receive_metrics(
     5. Обновляет last_seen_at робота
     """
     body = await request.body()
-    
+
     if not body:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Тело запроса пустое",
         )
-    
+
     content_encoding = request.headers.get("content-encoding", "").lower()
     if content_encoding == "gzip":
         try:
@@ -114,14 +114,14 @@ async def receive_metrics(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Невалидные gzip данные",
             )
-    
+
     influx_url = f"{settings.influxdb_url}/api/v2/write"
     params = {
         "org": settings.influxdb_org,
         "bucket": settings.influxdb_bucket,
         "precision": "ns",
     }
-    
+
     async with httpx.AsyncClient() as client:
         try:
             response = await client.post(
@@ -134,7 +134,7 @@ async def receive_metrics(
                 content=body,
                 timeout=10.0,
             )
-            
+
             if response.status_code not in (200, 204):
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
@@ -145,8 +145,8 @@ async def receive_metrics(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Ошибка соединения с InfluxDB: {str(e)}",
             )
-    
+
     robot.last_seen_at = datetime.now(UTC)
     await db.commit()
-    
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
