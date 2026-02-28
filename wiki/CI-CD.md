@@ -216,6 +216,45 @@ curl http://localhost:8000/health
 
 ---
 
+## Удаление с сервера
+
+Если нужно полностью удалить проект с сервера:
+
+```bash
+cd ~/app
+
+# Остановить контейнеры
+docker compose down
+
+# Остановить и удалить volumes (БД, данные)
+docker compose down -v
+
+# Удалить образы проекта
+docker images | grep wolfpack | awk '{print $3}' | xargs -r docker rmi
+
+# Удалить все неиспользуемые образы
+docker image prune -a -f
+
+# Удалить папку проекта
+cd ~
+rm -rf ~/app
+```
+
+### Частичная очистка
+
+```bash
+# Только остановить (данные сохранятся)
+docker compose stop
+
+# Перезапустить
+docker compose start
+
+# Пересоздать контейнеры (без потери данных)
+docker compose up -d --force-recreate
+```
+
+---
+
 ## GitHub Environments (опционально)
 
 Для защиты production с ручным подтверждением:

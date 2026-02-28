@@ -1,6 +1,8 @@
 name: CI
 
 on:
+  push:
+    branches: [main]
   pull_request:
     branches: [main, dev]
 
@@ -126,14 +128,21 @@ jobs:
       - name: Настройка Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Сборка API образа
+      - name: Сборка и экспорт образа
         uses: docker/build-push-action@v6
         with:
           context: ./server/api
-          push: false
-          tags: wpc-monitoring-api:test
+          tags: wpc-monitoring-api:latest
+          outputs: type=docker,dest=${{ runner.temp }}/api-image.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Upload образа
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-image
+          path: ${{ runner.temp }}/api-image.tar
+          retention-days: 1
 
       - name: Проверка docker-compose
         run: |
@@ -157,6 +166,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download образа
+        uses: actions/download-artifact@v4
+        with:
+          name: api-image
+          path: ${{ runner.temp }}
+
+      - name: Загрузка образа в Docker
+        run: |
+          docker load --input ${{ runner.temp }}/api-image.tar
+          docker image ls -a
+
       - name: Подготовка окружения
         run: |
           cp .env.example .env
@@ -169,7 +189,8 @@ jobs:
 
       - name: Запуск стека
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres influxdb api
+          export API_IMAGE=wpc-monitoring-api:latest
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --no-build postgres influxdb api
 
           # Ожидание готовности PostgreSQL
           echo "Ожидание PostgreSQL..."

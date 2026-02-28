@@ -43,6 +43,7 @@ services:
 
   # FastAPI — сервис привязки роботов
   api:
+    image: ${API_IMAGE:-ghcr.io/shiwarai/wolfpackcloud-monitoring-api:main}
     build:
       context: ./server/api
       dockerfile: Dockerfile
