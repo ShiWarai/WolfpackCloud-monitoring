@@ -1,7 +1,7 @@
 # WolfpackCloud Monitoring
 
-[![CI](https://github.com/ShiWarai/WolfpackCloud-monitoring/actions/workflows/ci.yml/badge.svg)](https://github.com/ShiWarai/WolfpackCloud-monitoring/actions/workflows/ci.yml)
-[![CD](https://github.com/ShiWarai/WolfpackCloud-monitoring/actions/workflows/cd.yml/badge.svg)](https://github.com/ShiWarai/WolfpackCloud-monitoring/actions/workflows/cd.yml)
+![CI](https://img.shields.io/github/actions/workflow/status/ShiWarai/WolfpackCloud-monitoring/ci.yml?label=CI)
+![CD](https://img.shields.io/github/actions/workflow/status/ShiWarai/WolfpackCloud-monitoring/cd.yml?label=CD)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Система мониторинга для роботов на одноплатных компьютерах (OrangePi5, Raspberry Pi). Сбор метрик, логов и визуализация в Grafana.
