@@ -100,7 +100,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT }}
           script: |
-            cd ~/app
+            cd ~/wolfpackcloud-monitoring
 
             # Бэкап текущей конфигурации
             cp .env .env.backup.$(date +%Y%m%d%H%M%S)
