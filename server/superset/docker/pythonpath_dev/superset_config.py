@@ -63,6 +63,7 @@ CELERY_CONFIG = CeleryConfig
 # ---- Security ----------------------------------------------------------------
 WTF_CSRF_ENABLED = True
 AUTH_TYPE = 1  # AUTH_DB
+FAB_ADD_SECURITY_API = True  # REST API для создания пользователей
 
 # ---- Localisation ------------------------------------------------------------
 LANGUAGES = {

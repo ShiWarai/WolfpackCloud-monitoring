@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import User, UserRole
+from app.services.external_auth import ExternalAuthService
 from app.schemas import (
     ErrorResponse,
     RefreshTokenRequest,
@@ -89,6 +90,19 @@ async def register(
     db.add(user)
     await db.commit()
     await db.refresh(user)
+
+    ext_auth = ExternalAuthService(settings)
+    grafana_id = await ext_auth.create_grafana_user(
+        email=user.email, password=request.password, name=user.name
+    )
+    superset_id = await ext_auth.create_superset_user(
+        email=user.email, password=request.password, name=user.name
+    )
+    if grafana_id is not None or superset_id is not None:
+        user.grafana_user_id = grafana_id
+        user.superset_user_id = superset_id
+        await db.commit()
+        await db.refresh(user)
 
     return UserResponse.model_validate(user)
 

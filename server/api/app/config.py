@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     influxdb_org: str = "wolfpackcloud"
     influxdb_bucket: str = "robots"
 
+    # Grafana (для создания учёток при регистрации)
+    grafana_url: str = "http://grafana:3000"
+    grafana_admin_user: str = "admin"
+    grafana_admin_password: str = "admin"
+
+    # Superset (для создания учёток при регистрации)
+    superset_url: str = "http://superset:8088"
+    superset_admin_username: str = "admin"
+    superset_admin_password: str = "admin"
+
     @property
     def async_database_url(self) -> str:
         """Возвращает URL для asyncpg."""
