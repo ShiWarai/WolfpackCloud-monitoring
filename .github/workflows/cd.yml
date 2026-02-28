@@ -111,8 +111,8 @@ jobs:
             git checkout main
             git pull origin main
 
-            # Обновление образов
-            docker compose pull
+            # Обновление образов (GHCR публичный, логин не нужен)
+            docker compose pull --ignore-pull-failures || true
 
             # Перезапуск
             docker compose up -d --remove-orphans
