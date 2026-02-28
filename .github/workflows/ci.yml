@@ -1,8 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches: [main, dev]
   pull_request:
     branches: [main, dev]
 
@@ -154,7 +152,6 @@ jobs:
     name: Интеграционные тесты
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
 
     steps:
       - name: Checkout
@@ -231,8 +228,8 @@ jobs:
   notify-telegram-on-success:
     name: Notify Telegram on success
     runs-on: ubuntu-latest
-    needs: [lint, test-api, build]
-    if: always() && needs.lint.result == 'success' && needs.test-api.result == 'success' && needs.build.result == 'success'
+    needs: [lint, test-api, build, integration]
+    if: always() && needs.lint.result == 'success' && needs.test-api.result == 'success' && needs.build.result == 'success' && needs.integration.result == 'success'
 
     steps:
       - name: Send Telegram notification (silent)
@@ -252,8 +249,8 @@ jobs:
   notify-telegram-on-failure:
     name: Notify Telegram on failure
     runs-on: ubuntu-latest
-    needs: [lint, test-api, build]
-    if: always() && (needs.lint.result == 'failure' || needs.test-api.result == 'failure' || needs.build.result == 'failure')
+    needs: [lint, test-api, build, integration]
+    if: always() && (needs.lint.result == 'failure' || needs.test-api.result == 'failure' || needs.build.result == 'failure' || needs.integration.result == 'failure')
 
     steps:
       - name: Send Telegram notification
