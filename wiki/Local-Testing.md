@@ -36,23 +36,28 @@ make agent
 После подтверждения привязки:
 
 1. Grafana → Dashboard → "Робот — Детали"
-2. В выпадающем списке выберите `local-test-robot`
+2. В выпадающем списке выберите `test-agent` (или имя, указанное через `NAME=`)
 3. Метрики появятся через 10-30 секунд
 
 ## Управление тестовым агентом
 
 ```bash
-# Запуск агента
+# Запуск агента (по умолчанию NAME=test-agent)
 make agent
 
+# Запуск агента с кастомным именем
+make agent NAME=robot-01
+
 # Просмотр логов
-make agent-logs
+make agent-logs              # для test-agent
+make agent-logs NAME=robot-01
 
 # Остановка агента
-make agent-stop
+make agent-stop              # остановит все агенты wpc-telegraf-*
+make agent-stop NAME=robot-01  # остановит только robot-01
 ```
 
-Агент запускается в Docker контейнере и собирает метрики хоста.
+Агент запускается в Docker контейнере (`wpc-telegraf-<name>`) и собирает метрики хоста.
 
 ## Тестирование API
 
@@ -182,16 +187,17 @@ docker compose logs
 
 ```bash
 # Проверьте логи Telegraf
-make agent-logs
+make agent-logs              # для test-agent
+make agent-logs NAME=robot-01  # для конкретного агента
 
-# Или напрямую через Docker
-docker logs wpc-monitoring-agent
+# Или напрямую через Docker (имя контейнера: wpc-telegraf-<name>)
+docker logs wpc-telegraf-test-agent
 
 # Проверьте конфигурацию
-docker exec wpc-monitoring-agent cat /etc/telegraf/telegraf.conf
+docker exec wpc-telegraf-test-agent cat /etc/telegraf/telegraf.conf
 
 # Тест конфигурации
-docker exec wpc-monitoring-agent telegraf --test
+docker exec wpc-telegraf-test-agent telegraf --test
 ```
 
 ### Нет данных в Grafana
