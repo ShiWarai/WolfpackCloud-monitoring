@@ -25,7 +25,7 @@ DOCKER_MODE=false
 METRICS_URL=""  # Явный URL для отправки метрик (если отличается от SERVER_URL)
 TELEGRAF_CONF_DIR="/etc/telegraf"
 TELEGRAF_CONF_FILE="${TELEGRAF_CONF_DIR}/telegraf.conf"
-TELEGRAF_CONTAINER_NAME="wpc-monitoring-agent"
+TELEGRAF_CONTAINER_NAME=""  # Устанавливается динамически после парсинга ROBOT_NAME
 
 # Логирование
 log_info() {
@@ -533,6 +533,11 @@ main() {
     echo ""
     
     parse_args "$@"
+    
+    # Установка имени контейнера на основе имени робота
+    local safe_name="${ROBOT_NAME:-$(get_hostname)}"
+    safe_name=$(echo "$safe_name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
+    TELEGRAF_CONTAINER_NAME="wpc-telegraf-${safe_name}"
     
     # Root нужен только для нативной установки
     if [ "$DOCKER_MODE" = false ]; then
