@@ -13,7 +13,9 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Grafana: http://localhost:3000 (admin / admin)
+### Порты
+
+Порты сервисов настраиваются в `.env`. См. переменные `CLIENT_PORT`, `API_PORT`, `GRAFANA_PORT`, `SUPERSET_PORT`.
 
 ### Робот
 
@@ -21,26 +23,33 @@ Grafana: http://localhost:3000 (admin / admin)
 curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/main/agent/install.sh | sudo bash -s -- --server YOUR_SERVER_URL
 ```
 
-Введите 8-значный код в Grafana.
+После установки:
+1. Откройте веб-приложение (URL и порт см. в `.env`)
+2. Войдите под администратором (учётные данные в `.env`)
+3. Перейдите в раздел "Привязка" и введите 8-значный код
 
 ## Навигация
 
 | Страница | Описание |
 |----------|----------|
 | [[Architecture]] | Архитектура, компоненты, потоки данных |
+| [[Web-App]] | Веб-приложение (Vue 3) |
 | [[Installation]] | Установка агента на робота |
 | [[Server-Setup]] | Развёртывание сервера |
 | [[CI-CD]] | Настройка CI/CD пайплайнов |
 | [[API-Reference]] | Документация API |
-| [[Grafana-Dashboards]] | Описание дашбордов |
+| [[Grafana-Dashboards]] | Дашборды мониторинга (real-time) |
+| [[Superset-Dashboards]] | Дашборды аналитики (BI) |
 | [[Local-Testing]] | Тестирование без робота |
 | [[Troubleshooting]] | Решение проблем |
 
 ## Стек
 
+- **Веб**: Vue 3 + TypeScript + Tailwind CSS
+- **API**: FastAPI (Python)
 - **Агент**: Telegraf
 - **Метрики**: InfluxDB 2.x
 - **БД**: PostgreSQL 16
-- **Дашборды**: Grafana
-- **API**: FastAPI
+- **Мониторинг**: Grafana
+- **Аналитика**: Apache Superset
 - **Деплой**: Docker Compose, GitHub Actions

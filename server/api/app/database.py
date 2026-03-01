@@ -46,6 +46,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Инициализация таблиц в БД."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Инициализация таблиц в БД.
+
+    Миграции управляются через Alembic (запускаются в entrypoint.sh).
+    Эта функция оставлена для совместимости, но не создаёт таблицы.
+    """
+    pass

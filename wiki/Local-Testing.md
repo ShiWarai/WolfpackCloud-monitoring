@@ -5,46 +5,31 @@
 ## Быстрый старт
 
 ```bash
-# Запуск всего стека + локального агента
-./scripts/local-install.sh
+# 1. Запуск серверного стека
+make dev
+
+# 2. Создание виртуального робота
+make agent
 ```
 
-Скрипт:
-1. Создаёт `.env` с тестовыми значениями
-2. Запускает Docker Compose стек
-3. Запускает Telegraf в контейнере
-4. Регистрирует тестового робота
-5. Выводит код привязки и URL сервисов
+`make agent` запускает тестового агента (Telegraf в контейнере), который:
+1. Регистрируется на сервере
+2. **Автоматически подтверждает привязку** (для удобства тестирования)
+3. Получает персональный токен
+4. Начинает отправлять метрики через `POST /api/metrics`
 
 ## Доступ к сервисам
 
-После запуска:
+После `make dev` сервисы доступны на портах из `.env`:
 
-| Сервис | URL | Учётные данные |
-|--------|-----|----------------|
-| Grafana | http://localhost:3000 | admin / admin |
-| API | http://localhost:8000/docs | — |
-| Superset | http://localhost:8088 | admin / admin |
-| InfluxDB | http://localhost:8086 | admin / testpassword123 |
-| PostgreSQL | localhost:5432 | monitoring / testpassword123 |
-
-## Подтверждение привязки
-
-1. Откройте http://localhost:3000
-2. Войдите как admin/admin
-3. Перейдите в Dashboard → "Роботы — Обзор"
-4. Найдите тестового робота со статусом "Ожидает"
-5. Используйте код из терминала или файла `.local_pair_code`
-
-Или через API:
-
-```bash
-# Получить код
-cat .local_pair_code
-
-# Подтвердить
-curl -X POST "http://localhost:8000/api/pair/$(cat .local_pair_code)/confirm"
-```
+| Сервис | Переменная порта | Учётные данные |
+|--------|------------------|----------------|
+| Web App | `CLIENT_PORT` | см. `.env` (`DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD`) |
+| API | `API_PORT` (+ `/docs` для Swagger) | — |
+| Grafana | `GRAFANA_PORT` | см. `.env` (`GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`) |
+| Superset | `SUPERSET_PORT` | см. `.env` (`SUPERSET_ADMIN_USERNAME` / `SUPERSET_ADMIN_PASSWORD`) |
+| InfluxDB | 8086 (внутренний) | см. `.env` |
+| PostgreSQL | 5432 (внутренний) | см. `.env` |
 
 ## Просмотр метрик
 
@@ -54,56 +39,74 @@ curl -X POST "http://localhost:8000/api/pair/$(cat .local_pair_code)/confirm"
 2. В выпадающем списке выберите `local-test-robot`
 3. Метрики появятся через 10-30 секунд
 
-## Режимы установки
-
-### Docker (по умолчанию)
+## Управление тестовым агентом
 
 ```bash
-./scripts/local-install.sh --docker
+# Запуск агента
+make agent
+
+# Просмотр логов
+make agent-logs
+
+# Остановка агента
+make agent-stop
 ```
 
-Telegraf запускается в Docker контейнере, собирает метрики хоста.
-
-### Native
-
-```bash
-./scripts/local-install.sh --native
-```
-
-Telegraf устанавливается нативно на хост. Требует sudo.
+Агент запускается в Docker контейнере и собирает метрики хоста.
 
 ## Тестирование API
 
+Замените `$API_URL` на адрес API из `.env` (например, `http://localhost:$API_PORT`).
+
 ```bash
 # Health check
-curl http://localhost:8000/health
+curl $API_URL/health
 
-# Список роботов
-curl http://localhost:8000/api/robots
+# Получение JWT токена (вход)
+# Замените email/password на значения из .env
+TOKEN=$(curl -s -X POST $API_URL/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "$DEFAULT_ADMIN_EMAIL", "password": "$DEFAULT_ADMIN_PASSWORD"}' | jq -r '.access_token')
 
-# Регистрация нового робота
-curl -X POST http://localhost:8000/api/pair \
+# Список роботов (требует JWT)
+curl -H "Authorization: Bearer $TOKEN" $API_URL/api/robots
+
+# Регистрация нового робота (от агента, без JWT)
+curl -X POST $API_URL/api/pair \
   -H "Content-Type: application/json" \
   -d '{"hostname": "test-robot-2", "pair_code": "TEST5678"}'
 
 # Информация о коде
-curl http://localhost:8000/api/pair/TEST5678
+curl $API_URL/api/pair/TEST5678
 
-# Подтверждение
-curl -X POST http://localhost:8000/api/pair/TEST5678/confirm
+# Статус привязки (polling)
+curl $API_URL/api/pair/TEST5678/status
+
+# Подтверждение (требует JWT)
+curl -X POST -H "Authorization: Bearer $TOKEN" $API_URL/api/pair/TEST5678/confirm
+
+# Статус после подтверждения (теперь с токеном)
+curl $API_URL/api/pair/TEST5678/status
 ```
 
 ## Тестирование отправки метрик
 
-Ручная отправка в InfluxDB:
+### Через API (рекомендуемый способ)
 
 ```bash
-# Через curl
-curl -X POST "http://localhost:8086/api/v2/write?org=wolfpackcloud&bucket=robots" \
-  -H "Authorization: Token test-token-for-development-only" \
+# Получить токен робота
+ROBOT_TOKEN=$(cat .local_robot_token)
+
+# Отправить метрику через API
+curl -X POST "$API_URL/api/metrics" \
+  -H "Authorization: Bearer $ROBOT_TOKEN" \
   -H "Content-Type: text/plain" \
   --data-binary 'cpu,robot=manual-test,cpu=cpu-total usage_idle=75.5'
+```
 
+### Напрямую в InfluxDB (только для отладки)
+
+```bash
 # Через influx CLI в контейнере
 docker compose exec influxdb influx write \
   --bucket robots \
@@ -122,8 +125,8 @@ docker compose logs -f api
 docker compose logs -f grafana
 docker compose logs -f influxdb
 
-# Telegraf (локальный контейнер)
-docker logs -f wpc-telegraf-local
+# Telegraf (тестовый агент)
+make agent-logs
 ```
 
 ## База данных
@@ -137,7 +140,6 @@ docker compose exec postgres psql -U monitoring -d monitoring
 # Запросы
 SELECT * FROM robots;
 SELECT * FROM pair_codes;
-SELECT * FROM robots_view;
 ```
 
 ### InfluxDB
@@ -150,23 +152,19 @@ from(bucket: "robots")
   |> filter(fn: (r) => r["_measurement"] == "cpu")
   |> limit(n: 10)
 '
-
-# Через API
-curl -G "http://localhost:8086/api/v2/query" \
-  -H "Authorization: Token test-token-for-development-only" \
-  -H "Content-Type: application/vnd.flux" \
-  --data-urlencode 'org=wolfpackcloud' \
-  --data-urlencode 'query=from(bucket:"robots") |> range(start:-1h) |> limit(n:5)'
 ```
 
 ## Удаление
 
 ```bash
-# Удаление со всеми данными
-./scripts/local-uninstall.sh
+# Остановить агента
+make agent-stop
 
-# Сохранение данных (volumes)
-./scripts/local-uninstall.sh --keep-data
+# Очистить данные (метрики и роботы)
+make clean-data
+
+# Полная остановка стека
+make down
 ```
 
 ## Troubleshooting
@@ -174,25 +172,26 @@ curl -G "http://localhost:8086/api/v2/query" \
 ### Сервисы не запускаются
 
 ```bash
-# Проверьте порты
-sudo lsof -i :3000
-sudo lsof -i :8000
-sudo lsof -i :8086
-
-# Освободите порты или измените в .env
+# Проверьте, не заняты ли порты из .env
+# Освободите порты или измените значения в .env
+docker compose ps
+docker compose logs
 ```
 
 ### Telegraf не отправляет данные
 
 ```bash
 # Проверьте логи Telegraf
-docker logs wpc-telegraf-local
+make agent-logs
+
+# Или напрямую через Docker
+docker logs wpc-monitoring-agent
 
 # Проверьте конфигурацию
-docker exec wpc-telegraf-local cat /etc/telegraf/telegraf.conf
+docker exec wpc-monitoring-agent cat /etc/telegraf/telegraf.conf
 
 # Тест конфигурации
-docker exec wpc-telegraf-local telegraf --test
+docker exec wpc-monitoring-agent telegraf --test
 ```
 
 ### Нет данных в Grafana

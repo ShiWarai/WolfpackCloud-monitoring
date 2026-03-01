@@ -23,6 +23,10 @@ COPY requirements.txt .
 # hadolint ignore=DL3013
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Копирование alembic для миграций
+COPY alembic.ini .
+COPY alembic/ ./alembic/
+
 # -----------------------------------------------------------------------------
 # Development stage - с hot reload
 # -----------------------------------------------------------------------------
@@ -37,9 +41,12 @@ ENV DEBUG=true
 RUN pip install --no-cache-dir watchfiles
 
 COPY app/ ./app/
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
 EXPOSE 8000
 
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 # -----------------------------------------------------------------------------
@@ -54,9 +61,10 @@ ENV PYTHONUNBUFFERED=1
 RUN useradd --create-home --shell /bin/bash appuser
 
 COPY app/ ./app/
+COPY entrypoint.sh .
 
-# Смена владельца
-RUN chown -R appuser:appuser /app
+# Права на entrypoint и смена владельца
+RUN chmod +x entrypoint.sh && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
@@ -65,4 +73,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
+ENTRYPOINT ["./entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

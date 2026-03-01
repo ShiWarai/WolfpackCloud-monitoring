@@ -44,3 +44,6 @@ else
 fi
 
 echo "Init complete."
+echo ""
+echo "NOTE: Default dashboards will be provisioned by superset-provision container"
+echo "      after Superset web server is healthy."

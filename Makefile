@@ -2,7 +2,7 @@
 # WolfpackCloud Monitoring — Makefile
 # =============================================================================
 
-.PHONY: help install dev up down logs build test lint clean
+.PHONY: help install dev up down logs build test lint clean clean-data clean-docker agent agent-stop agent-logs
 
 # Переменные
 COMPOSE_FILE := docker-compose.yml
@@ -32,13 +32,19 @@ install: ## Установка зависимостей
 	pip install -r $(API_DIR)/requirements.txt
 	@echo "$(GREEN)Готово$(NC)"
 
+install-dev: ## Установка зависимостей для разработки
+	@echo "$(BLUE)Установка зависимостей Python (dev)...$(NC)"
+	pip install -r $(API_DIR)/requirements.txt -r $(API_DIR)/requirements-dev.txt
+	@echo "$(GREEN)Готово$(NC)"
+
 dev: ## Запуск dev-окружения
 	@echo "$(BLUE)Запуск dev-окружения...$(NC)"
 	docker-compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) up -d --build
 	@echo "$(GREEN)Сервисы запущены:$(NC)"
-	@echo "  Grafana:  http://localhost:3000"
 	@echo "  API:      http://localhost:8000/docs"
-	@echo "  Superset: http://localhost:8088"
+	@echo "  Grafana:  http://localhost:3000"
+	@echo "  Superset: http://localhost:8088 (или :9300)"
+	@echo "  Client:   http://localhost:9101"
 
 up: ## Запуск production стека
 	@echo "$(BLUE)Запуск production стека...$(NC)"
@@ -72,6 +78,11 @@ build-api: ## Сборка только API образа
 	docker build -t wpc-monitoring-api $(API_DIR)
 	@echo "$(GREEN)Готово$(NC)"
 
+build-client: ## Сборка только Client образа
+	@echo "$(BLUE)Сборка Client образа...$(NC)"
+	docker build -t wpc-monitoring-client client
+	@echo "$(GREEN)Готово$(NC)"
+
 # =============================================================================
 # Тестирование
 # =============================================================================
@@ -103,18 +114,29 @@ lint-fix: ## Автоисправление линтинга
 	@echo "$(GREEN)Готово$(NC)"
 
 # =============================================================================
-# Локальное тестирование
+# Тестовый агент (для локальной разработки)
 # =============================================================================
 
-local-install: ## Локальная установка для тестирования
-	@echo "$(BLUE)Локальная установка...$(NC)"
-	./scripts/local-install.sh
+AGENT_RUNNER := wpc-test-agent
+AGENT_TELEGRAF := wpc-monitoring-agent
+
+agent: ## Запуск тестового агента через install.sh --docker
+	@echo "$(BLUE)Запуск тестового агента (install.sh --docker)...$(NC)"
+	@mkdir -p .agent-data
+	@network=$$(docker network ls --format '{{.Name}}' | grep -E 'monitoring$$' | head -1); \
+	SERVER_URL=http://localhost:8000 \
+	ROBOT_NAME=test-agent \
+	AGENT_DATA_DIR=$(PWD)/.agent-data \
+	DOCKER_NETWORK=$$network \
+	bash $(PWD)/agent/install.sh --docker --server http://localhost:8000 --name test-agent --metrics-url http://api:8000/api/metrics
+
+agent-stop: ## Остановка тестового агента (Telegraf контейнер)
+	@echo "$(BLUE)Остановка агента...$(NC)"
+	@docker rm -f $(AGENT_TELEGRAF) 2>/dev/null || true
 	@echo "$(GREEN)Готово$(NC)"
 
-local-uninstall: ## Удаление локальной установки
-	@echo "$(BLUE)Удаление локальной установки...$(NC)"
-	./scripts/local-uninstall.sh
-	@echo "$(GREEN)Готово$(NC)"
+agent-logs: ## Логи тестового агента (Telegraf)
+	docker logs -f $(AGENT_TELEGRAF)
 
 # =============================================================================
 # База данных
@@ -141,10 +163,24 @@ clean: ## Очистка временных файлов
 	find . -type d -name "htmlcov" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete 2>/dev/null || true
 	find . -type f -name ".coverage" -delete 2>/dev/null || true
-	rm -f .local_pair_code 2>/dev/null || true
+	rm -f .local_pair_code .local_robot_token 2>/dev/null || true
+	rm -rf .agent-data 2>/dev/null || true
 	@echo "$(GREEN)Готово$(NC)"
 
-clean-docker: ## Очистка Docker ресурсов
+clean-data: ## Очистка всех данных в БД (метрики и роботы)
+	@echo "$(YELLOW)Очистка данных в InfluxDB и PostgreSQL...$(NC)"
+	@docker-compose exec -T influxdb influx delete \
+		--bucket robots \
+		--org wolfpackcloud \
+		--start '1970-01-01T00:00:00Z' \
+		--stop '2030-01-01T00:00:00Z' 2>/dev/null || true
+	@docker-compose exec -T postgres psql -U monitoring -d monitoring -c "TRUNCATE pair_codes, robots RESTART IDENTITY CASCADE;" 2>/dev/null || true
+	@docker rm -f wpc-telegraf-local $(AGENT_TELEGRAF) 2>/dev/null || true
+	@rm -f .local_robot_token 2>/dev/null || true
+	@rm -rf .agent-data 2>/dev/null || true
+	@echo "$(GREEN)Данные очищены$(NC)"
+
+clean-docker: ## Очистка Docker ресурсов (удалит все данные!)
 	@echo "$(YELLOW)Внимание: это удалит все данные!$(NC)"
 	@read -p "Продолжить? (y/N): " confirm && [ "$$confirm" = "y" ]
 	docker-compose -f $(COMPOSE_FILE) -f $(COMPOSE_DEV_FILE) down -v --rmi local

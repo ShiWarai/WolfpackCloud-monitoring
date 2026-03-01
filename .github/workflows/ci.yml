@@ -95,13 +95,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('server/api/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('server/api/requirements.txt', 'server/api/requirements-dev.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
       - name: Установка зависимостей
         run: |
-          pip install -r server/api/requirements.txt
+          pip install -r server/api/requirements.txt -r server/api/requirements-dev.txt
 
       - name: Запуск тестов
         env:
@@ -234,9 +234,18 @@ jobs:
             exit 1
           fi
 
-          # Тест списка роботов
+          # Получение JWT токена для авторизации
+          echo "Получение JWT токена..."
+          token_response=$(curl -sf -X POST http://localhost:8000/api/auth/login \
+            -H "Content-Type: application/json" \
+            -d '{"email": "admin@wolfpackcloud.dev", "password": "admin"}')
+          access_token=$(echo "$token_response" | jq -r '.access_token')
+          echo "Токен получен: ${access_token:0:20}..."
+
+          # Тест списка роботов (требует авторизации)
           echo "Тест списка роботов..."
-          curl -sf http://localhost:8000/api/robots
+          curl -sf http://localhost:8000/api/robots \
+            -H "Authorization: Bearer $access_token"
 
       - name: Остановка стека
         if: always()

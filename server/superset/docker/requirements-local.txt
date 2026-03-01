@@ -1,0 +1,2 @@
+# Local requirements for Superset provisioning
+requests>=2.31.0

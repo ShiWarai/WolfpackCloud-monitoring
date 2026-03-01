@@ -24,17 +24,38 @@ class Settings(BaseSettings):
     api_base_url: str = "http://localhost:8000"
 
     # Безопасность
-    secret_key: str = "change-me-in-production"
+    secret_key: str = "dev-secret-key-change-in-production"
     pair_code_expiration_minutes: int = 15
 
+    # JWT
+    jwt_secret_key: str = "dev-jwt-secret-key-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 30
+    jwt_refresh_token_expire_days: int = 7
+
     # PostgreSQL
-    database_url: str = "postgresql+asyncpg://monitoring:monitoring@localhost:5432/monitoring"
+    database_url: str = "postgresql://monitoring:monitoring@localhost:5432/monitoring"
 
     # InfluxDB
     influxdb_url: str = "http://localhost:8086"
-    influxdb_token: str = ""
+    influxdb_token: str = "dev-influxdb-token"
     influxdb_org: str = "wolfpackcloud"
     influxdb_bucket: str = "robots"
+
+    # Grafana
+    grafana_url: str = "http://localhost:3000"
+    grafana_admin_user: str = "admin"
+    grafana_admin_password: str = "admin"
+
+    # Superset
+    superset_url: str = "http://localhost:8088"
+    superset_admin_username: str = "admin"
+    superset_admin_password: str = "admin"
+
+    # Администратор WolfpackCloud (создаётся при запуске)
+    default_admin_email: str = "admin@wolfpackcloud.local"
+    default_admin_password: str = "admin"
+    default_admin_name: str = "Admin"
 
     @property
     def async_database_url(self) -> str:

@@ -8,8 +8,7 @@
 
 ## Быстрый старт
 
-### Сервер
-
+**Сервер:**
 ```bash
 git clone https://github.com/ShiWarai/WolfpackCloud-monitoring.git
 cd WolfpackCloud-monitoring
@@ -17,34 +16,43 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Grafana: http://localhost:3000 (admin / admin)
-
-### Робот
-
+**Робот:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/main/agent/install.sh | sudo bash -s -- --server YOUR_SERVER_URL
+curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/main/agent/install.sh | sudo bash -s -- --server https://YOUR_SERVER_URL
 ```
 
-Введите 8-значный код в Grafana для привязки.
+После установки:
+1. Откройте веб-приложение (URL и порты см. в `.env`)
+2. Войдите (учётные данные в `.env`)
+3. Введите 8-значный код с робота для привязки
+
+## Сервисы
+
+| Сервис | Переменная порта | Описание |
+|--------|------------------|----------|
+| Client | `CLIENT_PORT` | Веб-приложение (Vue 3) |
+| API | `API_PORT` | REST API (FastAPI) |
+| Grafana | `GRAFANA_PORT` | Дашборды метрик |
+| Superset | `SUPERSET_PORT` | BI-аналитика |
+
+Все порты и учётные данные настраиваются в `.env`.
 
 ## Стек
 
-| Компонент | Технология |
-|-----------|------------|
-| Агент | Telegraf |
-| Метрики | InfluxDB 2.x |
-| Дашборды | Grafana |
-| API | FastAPI |
-| БД | PostgreSQL |
+```
+Robot: Telegraf Agent
+        ↓
+Server: Vue 3 → FastAPI → PostgreSQL
+                    ↓
+              InfluxDB → Grafana
+```
 
 ## Документация
-
-Подробная документация в [Wiki](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki):
 
 - [Архитектура](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Architecture)
 - [Установка агента](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Installation)
 - [Настройка сервера](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Server-Setup)
-- [CI/CD](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/CI-CD)
+- [Веб-приложение](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/Web-App)
 - [API Reference](https://github.com/ShiWarai/WolfpackCloud-monitoring/wiki/API-Reference)
 
 ## Лицензия

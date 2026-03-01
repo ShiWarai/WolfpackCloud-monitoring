@@ -270,7 +270,8 @@ dev → main (PR)
 
 ```bash
 # Локальный запуск для тестирования
-./scripts/local-install.sh
+make dev
+make agent
 
 # Проверка конфигурации
 docker compose config

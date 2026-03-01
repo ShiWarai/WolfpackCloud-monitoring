@@ -14,7 +14,8 @@ from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.database import get_db
-from app.models import PairCode, PairCodeStatus, Robot, RobotStatus
+from app.deps import get_current_user
+from app.models import PairCode, PairCodeStatus, Robot, RobotStatus, User
 from app.schemas import (
     ErrorResponse,
     PairCodeInfoResponse,
@@ -22,6 +23,7 @@ from app.schemas import (
     PairConfirmResponse,
     PairRequest,
     PairResponse,
+    PairStatusResponse,
 )
 
 router = APIRouter(prefix="/api/pair", tags=["pairing"])
@@ -133,26 +135,96 @@ async def get_pair_code_info(
     return PairCodeInfoResponse.model_validate(pair_code)
 
 
+@router.get(
+    "/{code}/status",
+    response_model=PairStatusResponse,
+    responses={
+        404: {"model": ErrorResponse, "description": "Код не найден"},
+    },
+    summary="Статус привязки (для polling)",
+    description="""
+Возвращает статус привязки. Используется агентом для polling после регистрации.
+
+После подтверждения привязки возвращает токен для отправки метрик.
+    """,
+)
+async def get_pair_status(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+) -> PairStatusResponse:
+    """
+    Возвращает статус привязки для агента.
+
+    Агент вызывает этот эндпоинт периодически после регистрации,
+    чтобы узнать, подтверждена ли привязка и получить токен.
+    """
+    result = await db.execute(
+        select(PairCode).options(selectinload(PairCode.robot)).where(PairCode.code == code.upper())
+    )
+    pair_code = result.scalar_one_or_none()
+
+    if not pair_code:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Код привязки не найден",
+        )
+
+    # Проверяем истечение срока
+    if pair_code.status == PairCodeStatus.PENDING and pair_code.expires_at < datetime.now(UTC):
+        pair_code.status = PairCodeStatus.EXPIRED
+        await db.commit()
+
+    robot = pair_code.robot
+
+    if pair_code.status == PairCodeStatus.CONFIRMED:
+        return PairStatusResponse(
+            status=pair_code.status,
+            robot_id=robot.id,
+            robot_token=robot.influxdb_token,
+            api_url=f"{settings.api_base_url}/api/metrics",
+            message="Привязка подтверждена. Используйте токен для отправки метрик.",
+        )
+    elif pair_code.status == PairCodeStatus.EXPIRED:
+        return PairStatusResponse(
+            status=pair_code.status,
+            robot_id=None,
+            robot_token=None,
+            api_url=settings.api_base_url,
+            message="Срок действия кода истёк. Зарегистрируйтесь заново.",
+        )
+    else:
+        return PairStatusResponse(
+            status=pair_code.status,
+            robot_id=robot.id,
+            robot_token=None,
+            api_url=settings.api_base_url,
+            message="Ожидание подтверждения пользователем.",
+        )
+
+
 @router.post(
     "/{code}/confirm",
     response_model=PairConfirmResponse,
     responses={
         400: {"model": ErrorResponse, "description": "Невозможно подтвердить"},
+        401: {"model": ErrorResponse, "description": "Требуется авторизация"},
         404: {"model": ErrorResponse, "description": "Код не найден"},
         410: {"model": ErrorResponse, "description": "Код истёк"},
     },
     summary="Подтверждение привязки",
-    description="Подтверждает привязку робота. Вызывается пользователем из панели управления.",
+    description="Подтверждает привязку робота к текущему пользователю. Требуется авторизация.",
 )
 async def confirm_pairing(
     code: str,
     request: PairConfirmRequest | None = None,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PairConfirmResponse:
     """
-    Подтверждает привязку робота.
+    Подтверждает привязку робота к текущему пользователю.
 
     После подтверждения:
+    - Робот привязывается к текущему пользователю (owner_id)
     - Статус робота меняется на ACTIVE
     - Генерируется токен InfluxDB для отправки метрик
     - Код привязки помечается как CONFIRMED
@@ -168,7 +240,6 @@ async def confirm_pairing(
             detail="Код привязки не найден",
         )
 
-    # Проверяем статус
     if pair_code.status == PairCodeStatus.CONFIRMED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -183,18 +254,16 @@ async def confirm_pairing(
             detail="Срок действия кода истёк",
         )
 
-    # Генерируем токен InfluxDB
     influxdb_token = generate_influxdb_token()
 
-    # Обновляем робота
     robot = pair_code.robot
     if request and request.robot_name:
         robot.name = request.robot_name
     robot.status = RobotStatus.ACTIVE
     robot.influxdb_token = influxdb_token
     robot.last_seen_at = datetime.now(UTC)
+    robot.owner_id = current_user.id
 
-    # Обновляем код привязки
     pair_code.status = PairCodeStatus.CONFIRMED
     pair_code.confirmed_at = datetime.now(UTC)
 
@@ -204,5 +273,5 @@ async def confirm_pairing(
         robot_id=robot.id,
         status=robot.status,
         influxdb_token=influxdb_token,
-        message=f"Робот '{robot.name}' успешно привязан и готов к мониторингу.",
+        message=f"Робот '{robot.name}' успешно привязан к пользователю {current_user.name}.",
     )

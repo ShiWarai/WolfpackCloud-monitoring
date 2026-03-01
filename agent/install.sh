@@ -21,8 +21,11 @@ NC='\033[0m' # No Color
 # Конфигурация по умолчанию
 SERVER_URL=""
 ROBOT_NAME=""
+DOCKER_MODE=false
+METRICS_URL=""  # Явный URL для отправки метрик (если отличается от SERVER_URL)
 TELEGRAF_CONF_DIR="/etc/telegraf"
 TELEGRAF_CONF_FILE="${TELEGRAF_CONF_DIR}/telegraf.conf"
+TELEGRAF_CONTAINER_NAME="wpc-monitoring-agent"
 
 # Логирование
 log_info() {
@@ -84,8 +87,12 @@ detect_distro() {
 
 # Генерация 8-значного кода привязки
 generate_pair_code() {
-    # Генерируем 8-значный буквенно-цифровой код (без похожих символов: 0,O,1,l,I)
-    tr -dc 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' < /dev/urandom | head -c 8
+    local chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+    local code=""
+    for _ in $(seq 1 8); do
+        code="${code}${chars:$((RANDOM % ${#chars})):1}"
+    done
+    echo "$code"
 }
 
 # Получение hostname
@@ -142,6 +149,23 @@ EOF
     log_success "Telegraf установлен"
 }
 
+# Установка Telegraf в Docker-режиме (проверка Docker, pull образа)
+install_telegraf_docker() {
+    log_info "Режим Docker: проверка наличия Docker..."
+
+    if ! command -v docker &>/dev/null; then
+        log_error "Docker не найден. Установите Docker: https://docs.docker.com/engine/install/"
+    fi
+
+    if ! docker info &>/dev/null; then
+        log_error "Docker daemon недоступен. Убедитесь, что Docker запущен и у вас есть права."
+    fi
+
+    log_info "Загрузка образа Telegraf..."
+    docker pull telegraf:1.32-alpine
+    log_success "Telegraf (Docker) готов"
+}
+
 # Регистрация робота на сервере
 register_robot() {
     local pair_code="$1"
@@ -166,38 +190,105 @@ register_robot() {
             \"pair_code\": \"${pair_code}\"
         }" 2>&1) || log_error "Не удалось связаться с сервером: $response"
     
-    # Извлекаем токен InfluxDB из ответа
-    local influx_token
-    influx_token=$(echo "$response" | grep -oP '"influxdb_token":\s*"\K[^"]+' || echo "")
+    log_success "Робот зарегистрирован. Ожидание подтверждения..."
+}
+
+# Ожидание подтверждения привязки (polling)
+wait_for_confirmation() {
+    local pair_code="$1"
+    local timeout_seconds=900  # 15 минут
+    local poll_interval=5
+    local elapsed=0
     
-    if [ -z "$influx_token" ]; then
-        log_warn "Токен InfluxDB не получен. Робот будет ожидать подтверждения."
-        echo ""
-    else
-        echo "$influx_token"
-    fi
+    log_info "Ожидание подтверждения привязки..."
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                  ║"
+    echo "║   Для привязки робота введите код в панели управления:           ║"
+    echo "║                                                                  ║"
+    echo "║              ┌──────────────────┐                                ║"
+    echo "║              │    ${pair_code}        │                                ║"
+    echo "║              └──────────────────┘                                ║"
+    echo "║                                                                  ║"
+    echo "║   Панель управления: ${SERVER_URL}                               "
+    echo "║   Код действителен 15 минут.                                     ║"
+    echo "║                                                                  ║"
+    echo "╚══════════════════════════════════════════════════════════════════╝"
+    echo ""
+    
+    while [ $elapsed -lt $timeout_seconds ]; do
+        local response
+        response=$(curl -sfL "${SERVER_URL}/api/pair/${pair_code}/status" 2>/dev/null || echo "")
+        
+        if [ -z "$response" ]; then
+            log_warn "Не удалось связаться с сервером. Повторная попытка..."
+            sleep $poll_interval
+            elapsed=$((elapsed + poll_interval))
+            continue
+        fi
+        
+        local status
+        status=$(echo "$response" | grep -oP '"status":\s*"\K[^"]+' || echo "pending")
+        
+        case "$status" in
+            confirmed)
+                local robot_token
+                local api_url
+                robot_token=$(echo "$response" | grep -oP '"robot_token":\s*"\K[^"]+' || echo "")
+                api_url=$(echo "$response" | grep -oP '"api_url":\s*"\K[^"]+' || echo "${SERVER_URL}/api/metrics")
+                
+                if [ -n "$robot_token" ]; then
+                    log_success "Привязка подтверждена!"
+                    # Возвращаем токен и URL через глобальные переменные
+                    ROBOT_TOKEN="$robot_token"
+                    API_URL="$api_url"
+                    return 0
+                else
+                    log_error "Токен не получен после подтверждения"
+                fi
+                ;;
+            expired)
+                log_error "Срок действия кода привязки истёк. Запустите установку заново."
+                ;;
+            pending)
+                echo -n "."
+                ;;
+        esac
+        
+        sleep $poll_interval
+        elapsed=$((elapsed + poll_interval))
+    done
+    
+    echo ""
+    log_error "Время ожидания подтверждения истекло. Запустите установку заново."
 }
 
 # Настройка Telegraf
 configure_telegraf() {
-    local influx_token="$1"
-    local robot_name="$2"
-    
-    log_info "Настройка Telegraf..."
-    
-    # Бэкап существующей конфигурации
-    if [ -f "$TELEGRAF_CONF_FILE" ]; then
-        cp "$TELEGRAF_CONF_FILE" "${TELEGRAF_CONF_FILE}.backup.$(date +%Y%m%d%H%M%S)"
+    local robot_token="$1"
+    local api_url="$2"
+    local robot_name="$3"
+    local conf_file="$TELEGRAF_CONF_FILE"
+
+    # Используем явно указанный METRICS_URL, если задан
+    if [ -n "$METRICS_URL" ]; then
+        api_url="$METRICS_URL"
     fi
-    
-    # Определяем URL для InfluxDB (всегда порт 8086)
-    # Удаляем существующий порт (если есть) и добавляем :8086
-    local server_base
-    server_base=$(echo "$SERVER_URL" | sed -E 's|(https?://[^/:]+)(:[0-9]+)?.*|\1|')
-    local influx_url="${server_base}:8086"
-    
-    # Создаём конфигурацию из шаблона
-    cat > "$TELEGRAF_CONF_FILE" << EOF
+
+    if [ "$DOCKER_MODE" = true ]; then
+        conf_file="${AGENT_DATA_DIR:-/tmp}/telegraf.conf"
+        mkdir -p "$(dirname "$conf_file")"
+    fi
+
+    log_info "Настройка Telegraf..."
+
+    # Бэкап существующей конфигурации (только для нативного режима)
+    if [ "$DOCKER_MODE" = false ] && [ -f "$conf_file" ]; then
+        cp "$conf_file" "${conf_file}.backup.$(date +%Y%m%d%H%M%S)"
+    fi
+
+    # Создаём конфигурацию
+    cat > "$conf_file" << EOF
 # Конфигурация Telegraf для WolfpackCloud Monitoring
 # Сгенерировано автоматически: $(date -Iseconds)
 # Робот: ${robot_name}
@@ -223,12 +314,17 @@ configure_telegraf() {
 #                            OUTPUT PLUGINS                                   #
 ###############################################################################
 
-[[outputs.influxdb_v2]]
-  urls = ["${influx_url}"]
-  token = "${influx_token}"
-  organization = "wolfpackcloud"
-  bucket = "robots"
-  timeout = "5s"
+# Отправка метрик через API (проксируется в InfluxDB)
+[[outputs.http]]
+  url = "${api_url}"
+  method = "POST"
+  data_format = "influx"
+  timeout = "10s"
+  content_encoding = "gzip"
+  
+  [outputs.http.headers]
+    Authorization = "Bearer ${robot_token}"
+    Content-Type = "text/plain; charset=utf-8"
 
 ###############################################################################
 #                            INPUT PLUGINS                                    #
@@ -279,21 +375,24 @@ configure_telegraf() {
   files = ["/var/log/syslog", "/var/log/messages"]
   from_beginning = false
   data_format = "grok"
-  grok_patterns = ["%{SYSLOGTIMESTAMP:timestamp} %{SYSLOGHOST:hostname} %{PROG:program}(?:\\[%{POSINT:pid}\\])?: %{GREEDYDATA:message}"]
+  grok_patterns = ['%{SYSLOGTIMESTAMP:timestamp} %{SYSLOGHOST:hostname} %{PROG:program}(?:\[%{POSINT:pid}\])?: %{GREEDYDATA:message}']
   name_override = "syslog"
   [inputs.tail.tags]
     source = "file"
 
 EOF
 
-    # Настройка rsyslog для отправки логов в Telegraf
-    if [ -d /etc/rsyslog.d ]; then
+    # Настройка rsyslog для отправки логов в Telegraf (только нативный режим)
+    if [ "$DOCKER_MODE" = false ] && [ -d /etc/rsyslog.d ]; then
         cat > /etc/rsyslog.d/50-telegraf.conf << 'RSYSLOG'
 # Отправка логов в Telegraf
 *.* @127.0.0.1:6514
 RSYSLOG
         systemctl restart rsyslog 2>/dev/null || true
     fi
+
+    # Сохраняем путь к конфигу для Docker-режима
+    TELEGRAF_CONF_FILE="$conf_file"
     
     log_success "Telegraf настроен"
 }
@@ -301,41 +400,71 @@ RSYSLOG
 # Запуск Telegraf
 start_telegraf() {
     log_info "Запуск Telegraf..."
-    
-    systemctl daemon-reload
-    systemctl enable telegraf
-    systemctl restart telegraf
-    
-    # Проверка статуса
-    sleep 2
-    if systemctl is-active --quiet telegraf; then
-        log_success "Telegraf запущен и работает"
+
+    if [ "$DOCKER_MODE" = true ]; then
+        # Остановить и удалить старый контейнер, если есть
+        docker rm -f "$TELEGRAF_CONTAINER_NAME" 2>/dev/null || true
+
+        # Путь к конфигу для volume: хост-путь если задан (для make agent), иначе локальный
+        local conf_volume_path="${TELEGRAF_CONF_HOST_PATH:-$TELEGRAF_CONF_FILE}"
+
+        local docker_args=(
+            run -d
+            --name "$TELEGRAF_CONTAINER_NAME"
+            --restart unless-stopped
+            -v "${conf_volume_path}:/etc/telegraf/telegraf.conf:ro"
+        )
+
+        # Подключить к сети мониторинга, если указана
+        if [ -n "${DOCKER_NETWORK:-}" ]; then
+            docker_args+=(--network "$DOCKER_NETWORK")
+        fi
+
+        docker_args+=(telegraf:1.32-alpine)
+
+        docker "${docker_args[@]}" || log_error "Не удалось запустить контейнер Telegraf"
+
+        sleep 2
+        if docker ps --format '{{.Names}}' | grep -q "^${TELEGRAF_CONTAINER_NAME}$"; then
+            log_success "Telegraf (Docker) запущен и работает"
+        else
+            log_error "Не удалось запустить Telegraf. Проверьте: docker logs $TELEGRAF_CONTAINER_NAME"
+        fi
     else
-        log_error "Не удалось запустить Telegraf. Проверьте: journalctl -u telegraf"
+        systemctl daemon-reload
+        systemctl enable telegraf
+        systemctl restart telegraf
+
+        sleep 2
+        if systemctl is-active --quiet telegraf; then
+            log_success "Telegraf запущен и работает"
+        else
+            log_error "Не удалось запустить Telegraf. Проверьте: journalctl -u telegraf"
+        fi
     fi
 }
 
-# Показать информацию о привязке
-show_pairing_info() {
-    local pair_code="$1"
+# Показать информацию об успешной установке
+show_success_info() {
+    local robot_name="$1"
     
     echo ""
     echo "╔══════════════════════════════════════════════════════════════════╗"
     echo "║                                                                  ║"
     echo "║   WolfpackCloud Monitoring Agent установлен успешно!             ║"
     echo "║                                                                  ║"
-    echo "║   Для привязки робота к панели мониторинга:                      ║"
+    echo "║   Робот: ${robot_name}                                           "
+    echo "║   Сервер: ${SERVER_URL}                                          "
     echo "║                                                                  ║"
-    echo "║   1. Откройте панель Grafana: ${SERVER_URL}                      "
-    echo "║   2. Перейдите в Dashboard → 'Роботы'                            ║"
-    echo "║   3. Нажмите 'Добавить робота'                                   ║"
-    echo "║   4. Введите код привязки:                                       ║"
-    echo "║                                                                  ║"
-    echo "║              ┌──────────────────┐                                ║"
-    echo "║              │    ${pair_code}        │                                ║"
-    echo "║              └──────────────────┘                                ║"
-    echo "║                                                                  ║"
-    echo "║   Код действителен 15 минут.                                     ║"
+    if [ "$DOCKER_MODE" = true ]; then
+        echo "║   Метрики отправляются через API (Docker).                        ║"
+        echo "║   Проверить: docker ps | grep $TELEGRAF_CONTAINER_NAME              "
+        echo "║   Логи: docker logs -f $TELEGRAF_CONTAINER_NAME                      "
+    else
+        echo "║   Метрики отправляются через API.                                ║"
+        echo "║   Проверить статус: systemctl status telegraf                    ║"
+        echo "║   Логи: journalctl -u telegraf -f                                ║"
+    fi
     echo "║                                                                  ║"
     echo "╚══════════════════════════════════════════════════════════════════╝"
     echo ""
@@ -353,13 +482,28 @@ parse_args() {
                 ROBOT_NAME="$2"
                 shift 2
                 ;;
+            --docker)
+                DOCKER_MODE=true
+                shift
+                ;;
+            --metrics-url|-m)
+                METRICS_URL="$2"
+                shift 2
+                ;;
             --help|-h)
-                echo "Использование: $0 --server SERVER_URL [--name ROBOT_NAME]"
+                echo "Использование: $0 --server SERVER_URL [--name ROBOT_NAME] [--docker] [--metrics-url URL]"
                 echo ""
                 echo "Опции:"
-                echo "  --server, -s URL    URL сервера мониторинга (обязательно)"
-                echo "  --name, -n NAME     Имя робота (по умолчанию: hostname)"
-                echo "  --help, -h          Показать эту справку"
+                echo "  --server, -s URL       URL сервера мониторинга (обязательно)"
+                echo "  --name, -n NAME        Имя робота (по умолчанию: hostname)"
+                echo "  --docker               Запуск Telegraf в Docker вместо нативной установки"
+                echo "  --metrics-url, -m URL  URL для отправки метрик (по умолчанию: SERVER_URL/api/metrics)"
+                echo "  --help, -h             Показать эту справку"
+                echo ""
+                echo "Примеры:"
+                echo "  $0 --server https://monitoring.example.com"
+                echo "  $0 --server https://monitoring.example.com --name my-robot"
+                echo "  $0 --server https://monitoring.example.com --docker"
                 exit 0
                 ;;
             *)
@@ -376,6 +520,10 @@ parse_args() {
     SERVER_URL="${SERVER_URL%/}"
 }
 
+# Глобальные переменные для токена (заполняются после подтверждения)
+ROBOT_TOKEN=""
+API_URL=""
+
 # Главная функция
 main() {
     echo ""
@@ -385,7 +533,11 @@ main() {
     echo ""
     
     parse_args "$@"
-    check_root
+    
+    # Root нужен только для нативной установки
+    if [ "$DOCKER_MODE" = false ]; then
+        check_root
+    fi
     
     log_info "Архитектура: $(detect_arch)"
     log_info "Дистрибутив: $(detect_distro)"
@@ -398,31 +550,41 @@ main() {
     local pair_code
     pair_code=$(generate_pair_code)
     
-    # Установка Telegraf
-    install_telegraf
-    
-    # Регистрация на сервере
-    local influx_token
-    influx_token=$(register_robot "$pair_code")
-    
-    # Если токен не получен, используем временный (будет обновлён после подтверждения)
-    if [ -z "$influx_token" ]; then
-        influx_token="pending_${pair_code}"
+    # Установка Telegraf (нативная или Docker)
+    if [ "$DOCKER_MODE" = true ]; then
+        install_telegraf_docker
+    else
+        install_telegraf
     fi
     
-    # Настройка Telegraf
+    # Регистрация на сервере
+    register_robot "$pair_code"
+    
+    # Ожидание подтверждения (polling)
+    wait_for_confirmation "$pair_code"
+    
+    # После подтверждения ROBOT_TOKEN и API_URL заполнены
     local robot_name="${ROBOT_NAME:-$(get_hostname)}"
-    configure_telegraf "$influx_token" "$robot_name"
+    
+    # Настройка Telegraf с полученным токеном
+    configure_telegraf "$ROBOT_TOKEN" "$API_URL" "$robot_name"
     
     # Запуск Telegraf
     start_telegraf
     
-    # Показываем информацию о привязке
-    show_pairing_info "$pair_code"
+    # Показываем информацию об успешной установке
+    show_success_info "$robot_name"
     
-    # Сохраняем код привязки для возможного повторного использования
-    echo "$pair_code" > /etc/telegraf/.pair_code
-    chmod 600 /etc/telegraf/.pair_code
+    # Сохраняем токен для возможного повторного использования
+    if [ "$DOCKER_MODE" = true ]; then
+        local token_dir="${AGENT_DATA_DIR:-/tmp}"
+        mkdir -p "$token_dir"
+        echo "$ROBOT_TOKEN" > "${token_dir}/.robot_token"
+        chmod 600 "${token_dir}/.robot_token"
+    else
+        echo "$ROBOT_TOKEN" > /etc/telegraf/.robot_token
+        chmod 600 /etc/telegraf/.robot_token
+    fi
 }
 
 main "$@"
