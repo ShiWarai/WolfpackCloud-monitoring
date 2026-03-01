@@ -16,6 +16,7 @@ from app.config import get_settings
 from app.database import init_db
 from app.routers import auth_router, metrics_router, pairing_router, robots_router
 from app.schemas import ErrorResponse, HealthResponse
+from app.tasks import start_scheduler, stop_scheduler
 
 settings = get_settings()
 
@@ -25,8 +26,10 @@ async def lifespan(_app: FastAPI):
     """Lifecycle события приложения."""
     # Startup
     await init_db()
+    start_scheduler()
     yield
     # Shutdown
+    stop_scheduler()
 
 
 app = FastAPI(

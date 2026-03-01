@@ -115,28 +115,33 @@ lint-fix: ## Автоисправление линтинга
 
 # =============================================================================
 # Тестовый агент (для локальной разработки)
+# Использование: make agent NAME=robot-01
 # =============================================================================
 
-AGENT_RUNNER := wpc-test-agent
-AGENT_TELEGRAF := wpc-monitoring-agent
+NAME ?= test-agent
 
-agent: ## Запуск тестового агента через install.sh --docker
-	@echo "$(BLUE)Запуск тестового агента (install.sh --docker)...$(NC)"
-	@mkdir -p .agent-data
+agent: ## Запуск тестового агента (NAME=имя для уникальных агентов)
+	@echo "$(BLUE)Запуск агента '$(NAME)' (install.sh --docker)...$(NC)"
+	@mkdir -p .agent-data/$(NAME)
 	@network=$$(docker network ls --format '{{.Name}}' | grep -E 'monitoring$$' | head -1); \
 	SERVER_URL=http://localhost:8000 \
-	ROBOT_NAME=test-agent \
-	AGENT_DATA_DIR=$(PWD)/.agent-data \
+	ROBOT_NAME=$(NAME) \
+	AGENT_DATA_DIR=$(PWD)/.agent-data/$(NAME) \
 	DOCKER_NETWORK=$$network \
-	bash $(PWD)/agent/install.sh --docker --server http://localhost:8000 --name test-agent --metrics-url http://api:8000/api/metrics
+	bash $(PWD)/agent/install.sh --docker --server http://localhost:8000 --name $(NAME) --metrics-url http://api:8000/api/metrics
 
-agent-stop: ## Остановка тестового агента (Telegraf контейнер)
-	@echo "$(BLUE)Остановка агента...$(NC)"
-	@docker rm -f $(AGENT_TELEGRAF) 2>/dev/null || true
+agent-stop: ## Остановка агента (NAME=имя или все если не указано)
+	@if [ "$(NAME)" = "test-agent" ]; then \
+		echo "$(BLUE)Остановка всех агентов wpc-telegraf-*...$(NC)"; \
+		docker ps -a --format '{{.Names}}' | grep '^wpc-telegraf-' | xargs -r docker rm -f 2>/dev/null || true; \
+	else \
+		echo "$(BLUE)Остановка агента wpc-telegraf-$(NAME)...$(NC)"; \
+		docker rm -f wpc-telegraf-$(NAME) 2>/dev/null || true; \
+	fi
 	@echo "$(GREEN)Готово$(NC)"
 
-agent-logs: ## Логи тестового агента (Telegraf)
-	docker logs -f $(AGENT_TELEGRAF)
+agent-logs: ## Логи агента (NAME=имя)
+	docker logs -f wpc-telegraf-$(NAME)
 
 # =============================================================================
 # База данных

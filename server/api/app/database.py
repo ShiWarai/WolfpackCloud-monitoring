@@ -31,6 +31,9 @@ async_session_maker = async_sessionmaker(
     autoflush=False,
 )
 
+# Алиас для фоновых задач (контекстный менеджер)
+async_session_factory = async_session_maker
+
 
 class Base(DeclarativeBase):
     """Базовый класс для ORM моделей."""

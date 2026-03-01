@@ -203,8 +203,8 @@ sudo apt install -y docker.io docker-compose-plugin git
 sudo usermod -aG docker $USER
 
 # Клонируйте репозиторий
-git clone https://github.com/ShiWarai/WolfpackCloud-monitoring.git /opt/wolfpackcloud-monitoring
-cd /opt/wolfpackcloud-monitoring
+git clone https://github.com/ShiWarai/WolfpackCloud-monitoring.git ~/wolfpackcloud-monitoring
+cd ~/wolfpackcloud-monitoring
 
 # Настройте окружение
 cp .env.example .env

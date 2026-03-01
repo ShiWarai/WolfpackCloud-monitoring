@@ -68,7 +68,7 @@
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as value FROM robots WHERE status = 'active' AND last_seen_at > NOW() - INTERVAL '2 minutes'",
+          "rawSql": "SELECT COUNT(*) as value FROM robots WHERE status = 'active'",
           "refId": "A"
         }
       ],
@@ -146,7 +146,7 @@
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT COUNT(*) as value FROM robots WHERE status = 'active' AND (last_seen_at IS NULL OR last_seen_at <= NOW() - INTERVAL '2 minutes')",
+          "rawSql": "SELECT COUNT(*) as value FROM robots WHERE status = 'inactive'",
           "refId": "A"
         }
       ],
@@ -218,7 +218,7 @@
           "datasource": { "type": "postgres", "uid": "PostgreSQL" },
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT id as \"ID\", name as \"Имя\", hostname as \"Hostname\", ip_address as \"IP-адрес\", architecture as \"Архитектура\", CASE WHEN status = 'pending' THEN 'pending' WHEN status = 'error' THEN 'error' WHEN last_seen_at > NOW() - INTERVAL '2 minutes' THEN 'active' ELSE 'inactive' END as \"Статус\", last_seen_at as \"Последняя активность\", created_at as \"Зарегистрирован\" FROM robots ORDER BY last_seen_at DESC NULLS LAST",
+          "rawSql": "SELECT id as \"ID\", name as \"Имя\", hostname as \"Hostname\", ip_address as \"IP-адрес\", architecture as \"Архитектура\", status as \"Статус\", last_seen_at as \"Последняя активность\", created_at as \"Зарегистрирован\" FROM robots ORDER BY last_seen_at DESC NULLS LAST",
           "refId": "A"
         }
       ],
