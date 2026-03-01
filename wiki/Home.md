@@ -17,13 +17,13 @@ docker compose up -d
 
 Порты сервисов настраиваются в `.env`. См. переменные `CLIENT_PORT`, `API_PORT`, `GRAFANA_PORT`, `SUPERSET_PORT`.
 
-### Робот
+### Роботы (на каждом)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/main/agent/install.sh | sudo bash -s -- --server YOUR_SERVER_URL
 ```
 
-После установки:
+После установки на каждом роботе:
 1. Откройте веб-приложение (URL и порт см. в `.env`)
 2. Войдите под администратором (учётные данные в `.env`)
 3. Перейдите в раздел "Привязка" и введите 8-значный код

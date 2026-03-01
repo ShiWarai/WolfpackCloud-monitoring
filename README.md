@@ -18,12 +18,12 @@ cp .env.example .env
 docker compose up -d
 ```
 
-**Робот:**
+**Роботы (на каждом):**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/main/agent/install.sh | sudo bash -s -- --server https://YOUR_SERVER_URL
 ```
 
-После установки:
+После установки на каждом роботе:
 1. Откройте веб-приложение (URL и порты см. в `.env`)
 2. Войдите (учётные данные в `.env`)
 3. Введите 8-значный код с робота для привязки
@@ -42,8 +42,8 @@ curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/m
 ## Стек
 
 ```
-Robot: Telegraf Agent
-        ↓
+Robots: Telegraf Agent (N шт.)
+            ↓
 Server: Vue 3 → FastAPI → PostgreSQL
                     ↓
               InfluxDB → Grafana
