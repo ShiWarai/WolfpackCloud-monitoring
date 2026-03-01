@@ -20,15 +20,16 @@ make dev
 
 ## Доступ к сервисам
 
-После `make dev`:
+После `make dev` сервисы доступны на портах из `.env`:
 
-| Сервис | URL | Учётные данные |
-|--------|-----|----------------|
-| Grafana | http://localhost:3000 | admin / admin |
-| API | http://localhost:8000/docs | — |
-| Superset | http://localhost:8088 | admin / admin |
-| InfluxDB | http://localhost:8086 | см. .env |
-| PostgreSQL | localhost:5432 | см. .env |
+| Сервис | Переменная порта | Учётные данные |
+|--------|------------------|----------------|
+| Web App | `CLIENT_PORT` | см. `.env` (`DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD`) |
+| API | `API_PORT` (+ `/docs` для Swagger) | — |
+| Grafana | `GRAFANA_PORT` | см. `.env` (`GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`) |
+| Superset | `SUPERSET_PORT` | см. `.env` (`SUPERSET_ADMIN_USERNAME` / `SUPERSET_ADMIN_PASSWORD`) |
+| InfluxDB | 8086 (внутренний) | см. `.env` |
+| PostgreSQL | 5432 (внутренний) | см. `.env` |
 
 ## Просмотр метрик
 
@@ -58,29 +59,37 @@ Telegraf устанавливается нативно на хост. Требу
 
 ## Тестирование API
 
+Замените `$API_URL` на адрес API из `.env` (например, `http://localhost:$API_PORT`).
+
 ```bash
 # Health check
-curl http://localhost:8000/health
+curl $API_URL/health
 
-# Список роботов
-curl http://localhost:8000/api/robots
+# Получение JWT токена (вход)
+# Замените email/password на значения из .env
+TOKEN=$(curl -s -X POST $API_URL/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "$DEFAULT_ADMIN_EMAIL", "password": "$DEFAULT_ADMIN_PASSWORD"}' | jq -r '.access_token')
 
-# Регистрация нового робота
-curl -X POST http://localhost:8000/api/pair \
+# Список роботов (требует JWT)
+curl -H "Authorization: Bearer $TOKEN" $API_URL/api/robots
+
+# Регистрация нового робота (от агента, без JWT)
+curl -X POST $API_URL/api/pair \
   -H "Content-Type: application/json" \
   -d '{"hostname": "test-robot-2", "pair_code": "TEST5678"}'
 
 # Информация о коде
-curl http://localhost:8000/api/pair/TEST5678
+curl $API_URL/api/pair/TEST5678
 
 # Статус привязки (polling)
-curl http://localhost:8000/api/pair/TEST5678/status
+curl $API_URL/api/pair/TEST5678/status
 
-# Подтверждение
-curl -X POST http://localhost:8000/api/pair/TEST5678/confirm
+# Подтверждение (требует JWT)
+curl -X POST -H "Authorization: Bearer $TOKEN" $API_URL/api/pair/TEST5678/confirm
 
 # Статус после подтверждения (теперь с токеном)
-curl http://localhost:8000/api/pair/TEST5678/status
+curl $API_URL/api/pair/TEST5678/status
 ```
 
 ## Тестирование отправки метрик
@@ -89,11 +98,11 @@ curl http://localhost:8000/api/pair/TEST5678/status
 
 ```bash
 # Получить токен робота
-TOKEN=$(cat .local_robot_token)
+ROBOT_TOKEN=$(cat .local_robot_token)
 
 # Отправить метрику через API
-curl -X POST "http://localhost:8000/api/metrics" \
-  -H "Authorization: Bearer $TOKEN" \
+curl -X POST "$API_URL/api/metrics" \
+  -H "Authorization: Bearer $ROBOT_TOKEN" \
   -H "Content-Type: text/plain" \
   --data-binary 'cpu,robot=manual-test,cpu=cpu-total usage_idle=75.5'
 ```
@@ -101,12 +110,6 @@ curl -X POST "http://localhost:8000/api/metrics" \
 ### Напрямую в InfluxDB (только для отладки)
 
 ```bash
-# Через curl (используйте токен из .env)
-curl -X POST "http://localhost:8086/api/v2/write?org=wolfpackcloud&bucket=robots" \
-  -H "Authorization: Token $(grep INFLUXDB_ADMIN_TOKEN .env | cut -d= -f2)" \
-  -H "Content-Type: text/plain" \
-  --data-binary 'cpu,robot=manual-test,cpu=cpu-total usage_idle=75.5'
-
 # Через influx CLI в контейнере
 docker compose exec influxdb influx write \
   --bucket robots \
@@ -153,13 +156,6 @@ from(bucket: "robots")
   |> filter(fn: (r) => r["_measurement"] == "cpu")
   |> limit(n: 10)
 '
-
-# Через API
-curl -G "http://localhost:8086/api/v2/query" \
-  -H "Authorization: Token test-token-for-development-only" \
-  -H "Content-Type: application/vnd.flux" \
-  --data-urlencode 'org=wolfpackcloud' \
-  --data-urlencode 'query=from(bucket:"robots") |> range(start:-1h) |> limit(n:5)'
 ```
 
 ## Удаление
@@ -177,12 +173,10 @@ curl -G "http://localhost:8086/api/v2/query" \
 ### Сервисы не запускаются
 
 ```bash
-# Проверьте порты
-sudo lsof -i :3000
-sudo lsof -i :8000
-sudo lsof -i :8086
-
-# Освободите порты или измените в .env
+# Проверьте, не заняты ли порты из .env
+# Освободите порты или измените значения в .env
+docker compose ps
+docker compose logs
 ```
 
 ### Telegraf не отправляет данные

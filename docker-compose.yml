@@ -5,13 +5,13 @@ services:
     container_name: wpc-monitoring-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-monitoring}
-      POSTGRES_USER: ${POSTGRES_USER:-monitoring}
+      POSTGRES_DB: ${POSTGRES_DB:?Задайте POSTGRES_DB в .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Задайте POSTGRES_USER в .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-monitoring}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,10 +25,10 @@ services:
     restart: unless-stopped
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
-      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_ADMIN_USER:-admin}
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_ADMIN_USER:?Задайте INFLUXDB_ADMIN_USER в .env}
       DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:?Задайте INFLUXDB_ADMIN_PASSWORD в .env}
-      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-wolfpackcloud}
-      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-robots}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:?Задайте INFLUXDB_ORG в .env}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:?Задайте INFLUXDB_BUCKET в .env}
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:?Задайте INFLUXDB_ADMIN_TOKEN в .env}
     volumes:
       - influxdb_data:/var/lib/influxdb2
@@ -51,25 +51,30 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: >-
-        postgresql+asyncpg://${POSTGRES_USER:-monitoring}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-monitoring}
+        postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       INFLUXDB_URL: http://influxdb:8086
-      INFLUXDB_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
-      INFLUXDB_ORG: ${INFLUXDB_ORG:-wolfpackcloud}
-      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-robots}
+      INFLUXDB_TOKEN: ${INFLUXDB_ADMIN_TOKEN:?Задайте INFLUXDB_ADMIN_TOKEN в .env}
+      INFLUXDB_ORG: ${INFLUXDB_ORG:?Задайте INFLUXDB_ORG в .env}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:?Задайте INFLUXDB_BUCKET в .env}
       SECRET_KEY: ${SECRET_KEY:?Задайте SECRET_KEY в .env}
+      PAIR_CODE_EXPIRATION_MINUTES: ${PAIR_CODE_EXPIRATION_MINUTES:?Задайте PAIR_CODE_EXPIRATION_MINUTES в .env}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Задайте JWT_SECRET_KEY в .env}
-      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-30}
-      JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:-7}
-      API_BASE_URL: ${API_BASE_URL:-http://localhost:9100}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:?Задайте JWT_ALGORITHM в .env}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:?Задайте JWT_ACCESS_TOKEN_EXPIRE_MINUTES в .env}
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: ${JWT_REFRESH_TOKEN_EXPIRE_DAYS:?Задайте JWT_REFRESH_TOKEN_EXPIRE_DAYS в .env}
+      API_BASE_URL: ${API_BASE_URL:?Задайте API_BASE_URL в .env}
       DEBUG: ${DEBUG:-false}
-      GRAFANA_URL: ${GRAFANA_URL:-http://grafana:3000}
-      GRAFANA_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      SUPERSET_URL: ${SUPERSET_URL:-http://superset:8088}
-      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
-      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      GRAFANA_URL: ${GRAFANA_URL:?Задайте GRAFANA_URL в .env}
+      GRAFANA_ADMIN_USER: ${GRAFANA_ADMIN_USER:?Задайте GRAFANA_ADMIN_USER в .env}
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Задайте GRAFANA_ADMIN_PASSWORD в .env}
+      SUPERSET_URL: ${SUPERSET_URL:?Задайте SUPERSET_URL в .env}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:?Задайте SUPERSET_ADMIN_USERNAME в .env}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:?Задайте SUPERSET_ADMIN_PASSWORD в .env}
+      DEFAULT_ADMIN_EMAIL: ${DEFAULT_ADMIN_EMAIL:?Задайте DEFAULT_ADMIN_EMAIL в .env}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:?Задайте DEFAULT_ADMIN_PASSWORD в .env}
+      DEFAULT_ADMIN_NAME: ${DEFAULT_ADMIN_NAME:?Задайте DEFAULT_ADMIN_NAME в .env}
     ports:
-      - "${API_PORT:-9100}:8000"
+      - "${API_PORT:?Задайте API_PORT в .env}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -90,12 +95,12 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: /api
-        VITE_GRAFANA_URL: ${GRAFANA_ROOT_URL:-http://localhost:9200}
-        VITE_SUPERSET_URL: ${SUPERSET_ROOT_URL:-http://localhost:9300}
+        VITE_GRAFANA_URL: ${GRAFANA_ROOT_URL:?Задайте GRAFANA_ROOT_URL в .env}
+        VITE_SUPERSET_URL: ${SUPERSET_ROOT_URL:?Задайте SUPERSET_ROOT_URL в .env}
     container_name: wpc-monitoring-client
     restart: unless-stopped
     ports:
-      - "${CLIENT_PORT:-9101}:80"
+      - "${CLIENT_PORT:?Задайте CLIENT_PORT в .env}:80"
     depends_on:
       api:
         condition: service_healthy
@@ -113,20 +118,20 @@ services:
     container_name: wpc-monitoring-grafana
     restart: unless-stopped
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:9200}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?Задайте GRAFANA_ADMIN_USER в .env}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Задайте GRAFANA_ADMIN_PASSWORD в .env}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:?Задайте GRAFANA_ROOT_URL в .env}
       GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
       # Переменные для datasources
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
-      POSTGRES_DB: ${POSTGRES_DB:-monitoring}
-      POSTGRES_USER: ${POSTGRES_USER:-monitoring}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       INFLUXDB_URL: http://influxdb:8086
       INFLUXDB_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
-      INFLUXDB_ORG: ${INFLUXDB_ORG:-wolfpackcloud}
-      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET:-robots}
+      INFLUXDB_ORG: ${INFLUXDB_ORG}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./server/grafana/provisioning:/etc/grafana/provisioning:ro
@@ -137,7 +142,7 @@ services:
       influxdb:
         condition: service_healthy
     ports:
-      - "${GRAFANA_PORT:-9200}:3000"
+      - "${GRAFANA_PORT:?Задайте GRAFANA_PORT в .env}:3000"
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
       interval: 10s
@@ -171,11 +176,11 @@ services:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:?Задайте SUPERSET_SECRET_KEY в .env}
       SUPERSET_LOAD_EXAMPLES: "no"
       DATABASE_DIALECT: postgresql
-      DATABASE_DB: ${POSTGRES_DB:-monitoring}
+      DATABASE_DB: ${POSTGRES_DB}
       DATABASE_HOST: postgres
       DATABASE_PORT: "5432"
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
-      DATABASE_USER: ${POSTGRES_USER:-monitoring}
+      DATABASE_USER: ${POSTGRES_USER}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       PYTHONPATH: /app/pythonpath:/app/docker/pythonpath_dev
@@ -202,7 +207,7 @@ services:
     environment: *superset-env
     volumes: *superset-volumes
     ports:
-      - "${SUPERSET_PORT:-9300}:8088"
+      - "${SUPERSET_PORT:?Задайте SUPERSET_PORT в .env}:8088"
     depends_on:
       superset-init:
         condition: service_completed_successfully
@@ -222,9 +227,9 @@ services:
     user: "root"
     environment:
       <<: *superset-env
-      SUPERSET_URL: http://superset:8088
-      SUPERSET_ADMIN_USERNAME: admin
-      SUPERSET_ADMIN_PASSWORD: admin
+      SUPERSET_URL: ${SUPERSET_URL:?Задайте SUPERSET_URL в .env}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:?Задайте SUPERSET_ADMIN_USERNAME в .env}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:?Задайте SUPERSET_ADMIN_PASSWORD в .env}
     volumes: *superset-volumes
     depends_on:
       superset:

@@ -84,12 +84,14 @@ async function handleSubmit() {
         </div>
       </form>
 
+      <!-- Регистрация отключена. Используется единственный аккаунт администратора.
       <p class="term-text-dim" style="text-align: center; margin-top: 1rem;">
         Нет аккаунта?
         <RouterLink to="/register" class="term-btn" style="margin-left: 0.5rem;">
           Регистрация
         </RouterLink>
       </p>
+      -->
     </div>
     
     <footer class="term-footer" style="position: fixed; bottom: 0; left: 0; right: 0;">

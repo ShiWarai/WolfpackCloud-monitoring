@@ -15,12 +15,7 @@ docker compose up -d
 
 ### Порты
 
-| Сервис | Порт | URL |
-|--------|------|-----|
-| Веб-приложение | 9101 | http://localhost:9101 |
-| API | 9100 | http://localhost:9100 |
-| Grafana | 9200 | http://localhost:9200 |
-| Superset | 9300 | http://localhost:9300 |
+Порты сервисов настраиваются в `.env`. См. переменные `CLIENT_PORT`, `API_PORT`, `GRAFANA_PORT`, `SUPERSET_PORT`.
 
 ### Робот
 
@@ -29,8 +24,8 @@ curl -fsSL https://raw.githubusercontent.com/ShiWarai/WolfpackCloud-monitoring/m
 ```
 
 После установки:
-1. Откройте веб-приложение (http://localhost:9101)
-2. Зарегистрируйтесь или войдите
+1. Откройте веб-приложение (URL и порт см. в `.env`)
+2. Войдите под администратором (учётные данные в `.env`)
 3. Перейдите в раздел "Привязка" и введите 8-значный код
 
 ## Навигация

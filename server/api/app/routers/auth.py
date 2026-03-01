@@ -58,53 +58,59 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> 
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 
-@router.post(
-    "/register",
-    response_model=UserResponse,
-    status_code=status.HTTP_201_CREATED,
-    responses={
-        409: {"model": ErrorResponse, "description": "Email уже зарегистрирован"},
-    },
-    summary="Регистрация пользователя",
-    description="Создаёт нового пользователя в системе.",
-)
-async def register(
-    request: UserCreate,
-    db: AsyncSession = Depends(get_db),
-) -> UserResponse:
-    """Регистрирует нового пользователя."""
-    existing = await db.execute(select(User).where(User.email == request.email.lower()))
-    if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Пользователь с таким email уже существует",
-        )
-
-    user = User(
-        email=request.email.lower(),
-        hashed_password=get_password_hash(request.password),
-        name=request.name,
-        role=UserRole.USER,
-        is_active=True,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-
-    ext_auth = ExternalAuthService(settings)
-    grafana_id = await ext_auth.create_grafana_user(
-        email=user.email, password=request.password, name=user.name
-    )
-    superset_id = await ext_auth.create_superset_user(
-        email=user.email, password=request.password, name=user.name
-    )
-    if grafana_id is not None or superset_id is not None:
-        user.grafana_user_id = grafana_id
-        user.superset_user_id = superset_id
-        await db.commit()
-        await db.refresh(user)
-
-    return UserResponse.model_validate(user)
+# =============================================================================
+# РЕГИСТРАЦИЯ ОТКЛЮЧЕНА
+# Используется единственный аккаунт администратора.
+# Для включения регистрации раскомментируйте код ниже.
+# =============================================================================
+#
+# @router.post(
+#     "/register",
+#     response_model=UserResponse,
+#     status_code=status.HTTP_201_CREATED,
+#     responses={
+#         409: {"model": ErrorResponse, "description": "Email уже зарегистрирован"},
+#     },
+#     summary="Регистрация пользователя",
+#     description="Создаёт нового пользователя в системе.",
+# )
+# async def register(
+#     request: UserCreate,
+#     db: AsyncSession = Depends(get_db),
+# ) -> UserResponse:
+#     """Регистрирует нового пользователя."""
+#     existing = await db.execute(select(User).where(User.email == request.email.lower()))
+#     if existing.scalar_one_or_none():
+#         raise HTTPException(
+#             status_code=status.HTTP_409_CONFLICT,
+#             detail="Пользователь с таким email уже существует",
+#         )
+#
+#     user = User(
+#         email=request.email.lower(),
+#         hashed_password=get_password_hash(request.password),
+#         name=request.name,
+#         role=UserRole.USER,
+#         is_active=True,
+#     )
+#     db.add(user)
+#     await db.commit()
+#     await db.refresh(user)
+#
+#     ext_auth = ExternalAuthService(settings)
+#     grafana_id = await ext_auth.create_grafana_user(
+#         email=user.email, password=request.password, name=user.name
+#     )
+#     superset_id = await ext_auth.create_superset_user(
+#         email=user.email, password=request.password, name=user.name
+#     )
+#     if grafana_id is not None or superset_id is not None:
+#         user.grafana_user_id = grafana_id
+#         user.superset_user_id = superset_id
+#         await db.commit()
+#         await db.refresh(user)
+#
+#     return UserResponse.model_validate(user)
 
 
 @router.post(

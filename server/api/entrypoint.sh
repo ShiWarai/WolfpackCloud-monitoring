@@ -46,5 +46,46 @@ else
     echo "Ошибка миграций или уже применены, продолжаем..."
 fi
 
+# Создание администратора по умолчанию
+echo "Проверка администратора..."
+python -c "
+import asyncio
+import os
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
+
+async def create_admin():
+    import asyncpg
+    
+    url = os.environ.get('DATABASE_URL', '')
+    url = url.replace('postgresql+asyncpg://', 'postgresql://')
+    
+    email = os.environ.get('DEFAULT_ADMIN_EMAIL', 'admin@wolfpackcloud.dev')
+    password = os.environ.get('DEFAULT_ADMIN_PASSWORD', 'admin')
+    name = os.environ.get('DEFAULT_ADMIN_NAME', 'Administrator')
+    
+    conn = await asyncpg.connect(url)
+    
+    # Проверяем, есть ли уже админ
+    existing = await conn.fetchrow('SELECT id FROM users WHERE email = \$1', email)
+    if existing:
+        print(f'Администратор {email} уже существует')
+        await conn.close()
+        return
+    
+    # Создаём админа
+    hashed = pwd_context.hash(password)
+    await conn.execute('''
+        INSERT INTO users (email, hashed_password, name, role, is_active, created_at, updated_at)
+        VALUES (\$1, \$2, \$3, 'admin', true, NOW(), NOW())
+    ''', email, hashed, name)
+    
+    print(f'Администратор создан: {email}')
+    await conn.close()
+
+asyncio.run(create_admin())
+" 2>&1 || echo "Не удалось создать администратора, возможно уже существует"
+
 echo "Запуск приложения..."
 exec "$@"

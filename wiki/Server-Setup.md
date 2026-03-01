@@ -50,15 +50,15 @@ JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 # Grafana
 GRAFANA_ADMIN_PASSWORD=admin  # Сменить после первого входа!
 
-# Порты
-API_PORT=9100
-CLIENT_PORT=9101
-GRAFANA_PORT=9200
-SUPERSET_PORT=9300
+# Порты (выберите свободные)
+API_PORT=...
+CLIENT_PORT=...
+GRAFANA_PORT=...
+SUPERSET_PORT=...
 
 # Внешние URL для кнопок в веб-приложении
-GRAFANA_ROOT_URL=http://localhost:9200
-SUPERSET_ROOT_URL=http://localhost:9300
+GRAFANA_ROOT_URL=...
+SUPERSET_ROOT_URL=...
 ```
 
 ### 3. Запуск
@@ -76,19 +76,20 @@ docker compose ps
 # Логи
 docker compose logs -f
 
-# Health check
-curl http://localhost:8000/health
+# Health check (порт API из .env)
+curl http://localhost:$API_PORT/health
 ```
 
 ## Доступ к сервисам
 
-| Сервис | URL | Учётные данные |
-|--------|-----|----------------|
-| Веб-приложение | http://localhost:9101 | Регистрация |
-| API Docs | http://localhost:9100/docs | — |
-| Grafana | http://localhost:9200 | admin / admin |
-| Superset | http://localhost:9300 | admin / admin |
-| InfluxDB | http://localhost:8086 | см. .env |
+Все URL и учётные данные настраиваются в `.env`:
+
+| Сервис | Переменная порта | Учётные данные |
+|--------|------------------|----------------|
+| Веб-приложение | `CLIENT_PORT` | `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` |
+| API Docs | `API_PORT` (+ `/docs`) | — |
+| Grafana | `GRAFANA_PORT` | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` |
+| Superset | `SUPERSET_PORT` | `SUPERSET_ADMIN_USERNAME` / `SUPERSET_ADMIN_PASSWORD` |
 
 ## Production настройка
 
@@ -227,8 +228,8 @@ docker stats
 ### API недоступен
 
 ```bash
-# Проверьте health
-curl http://localhost:9100/health
+# Проверьте health (порт из .env)
+curl http://localhost:$API_PORT/health
 
 # Проверьте подключение к БД
 docker compose exec api python -c "from app.database import engine; print(engine)"

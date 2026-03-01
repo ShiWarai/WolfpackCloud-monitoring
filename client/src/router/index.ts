@@ -10,12 +10,13 @@ const router = createRouter({
       component: () => import('@/pages/LoginPage.vue'),
       meta: { requiresGuest: true },
     },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('@/pages/RegisterPage.vue'),
-      meta: { requiresGuest: true },
-    },
+    // Регистрация отключена. Используется единственный аккаунт администратора.
+    // {
+    //   path: '/register',
+    //   name: 'register',
+    //   component: () => import('@/pages/RegisterPage.vue'),
+    //   meta: { requiresGuest: true },
+    // },
     {
       path: '/',
       redirect: '/dashboard',

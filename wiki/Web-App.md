@@ -4,16 +4,16 @@
 
 ## Доступ
 
-- **URL**: http://localhost:9101 (по умолчанию)
 - **Порт**: настраивается через `CLIENT_PORT` в `.env`
+- **Учётные данные**: `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` в `.env`
 
 ## Функционал
 
 ### Аутентификация
 
-- Регистрация по email/password
 - Вход с JWT токенами (access + refresh)
 - Автоматическое обновление токена
+- Используется единственный аккаунт администратора (регистрация отключена)
 
 ### Dashboard
 
@@ -62,7 +62,7 @@ client/
 │   ├── api/           # Axios client, endpoints
 │   ├── components/    # RobotCard, ExternalLinks
 │   ├── layouts/       # DefaultLayout
-│   ├── pages/         # Login, Register, Dashboard, Robots, Pairing
+│   ├── pages/         # Login, Dashboard, Robots, Pairing
 │   ├── router/        # Vue Router + auth guards
 │   ├── stores/        # Pinia stores (auth, robots)
 │   └── types/         # TypeScript типы
@@ -75,17 +75,17 @@ client/
 В `.env`:
 
 ```bash
-CLIENT_PORT=9101
-GRAFANA_ROOT_URL=http://localhost:9200
-SUPERSET_ROOT_URL=http://localhost:9300
+CLIENT_PORT=...
+GRAFANA_ROOT_URL=...
+SUPERSET_ROOT_URL=...
 ```
 
-При сборке Docker образа:
+При сборке Docker образа используются:
 
 ```bash
 VITE_API_URL=/api
-VITE_GRAFANA_URL=http://localhost:9200
-VITE_SUPERSET_URL=http://localhost:9300
+VITE_GRAFANA_URL=${GRAFANA_ROOT_URL}
+VITE_SUPERSET_URL=${SUPERSET_ROOT_URL}
 ```
 
 ## Разработка
@@ -98,7 +98,7 @@ npm install
 npm run dev
 ```
 
-Откроется на http://localhost:5173 с прокси на API.
+Откроется dev-сервер Vite с прокси на API.
 
 ### Сборка
 
@@ -112,4 +112,4 @@ make build-client
 make dev
 ```
 
-Клиент будет доступен на http://localhost:9101
+Клиент будет доступен на порту `CLIENT_PORT` из `.env`.

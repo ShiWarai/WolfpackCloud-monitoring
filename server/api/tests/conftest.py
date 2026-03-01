@@ -5,19 +5,27 @@
 import asyncio
 import os
 from collections.abc import AsyncGenerator
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from jose import jwt
+from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from app.config import get_settings
 from app.database import Base, get_db
 from app.main import app
+from app.models import User, UserRole
 
 TEST_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "postgresql+asyncpg://test:testpassword@localhost:5432/monitoring_test",
 )
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+settings = get_settings()
 
 
 @pytest.fixture(scope="session")
@@ -64,9 +72,38 @@ async def db_session(test_engine, setup_database) -> AsyncGenerator[AsyncSession
         await session.rollback()
 
 
+def create_test_access_token(user_id: int) -> str:
+    """Создаёт тестовый JWT access токен."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    to_encode = {"sub": str(user_id), "exp": expire, "type": "access"}
+    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
 @pytest.fixture
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """Асинхронный HTTP клиент с подменённой БД."""
+async def test_admin(db_session: AsyncSession) -> User:
+    """Создаёт тестового администратора."""
+    admin = User(
+        email="admin@test.local",
+        hashed_password=pwd_context.hash("testpassword"),
+        name="Test Admin",
+        role=UserRole.ADMIN,
+        is_active=True,
+    )
+    db_session.add(admin)
+    await db_session.commit()
+    await db_session.refresh(admin)
+    return admin
+
+
+@pytest.fixture
+async def admin_token(test_admin: User) -> str:
+    """JWT токен для тестового администратора."""
+    return create_test_access_token(test_admin.id)
+
+
+@pytest.fixture
+async def client(db_session: AsyncSession, test_admin: User, admin_token: str) -> AsyncGenerator[AsyncClient, None]:  # noqa: ARG001
+    """Асинхронный HTTP клиент с подменённой БД и авторизацией админа."""
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
@@ -76,6 +113,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
+        headers={"Authorization": f"Bearer {admin_token}"},
     ) as ac:
         yield ac
 

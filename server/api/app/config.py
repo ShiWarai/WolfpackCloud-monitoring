@@ -21,36 +21,41 @@ class Settings(BaseSettings):
     # Приложение
     app_name: str = "WolfpackCloud Monitoring API"
     debug: bool = False
-    api_base_url: str = "http://localhost:8000"
+    api_base_url: str
 
     # Безопасность
-    secret_key: str = "change-me-in-production"
-    pair_code_expiration_minutes: int = 15
+    secret_key: str
+    pair_code_expiration_minutes: int
 
     # JWT
-    jwt_secret_key: str = "change-me-jwt-secret-in-production"
-    jwt_algorithm: str = "HS256"
-    jwt_access_token_expire_minutes: int = 30
-    jwt_refresh_token_expire_days: int = 7
+    jwt_secret_key: str
+    jwt_algorithm: str
+    jwt_access_token_expire_minutes: int
+    jwt_refresh_token_expire_days: int
 
     # PostgreSQL
-    database_url: str = "postgresql+asyncpg://monitoring:monitoring@localhost:5432/monitoring"
+    database_url: str
 
     # InfluxDB
-    influxdb_url: str = "http://localhost:8086"
-    influxdb_token: str = ""
-    influxdb_org: str = "wolfpackcloud"
-    influxdb_bucket: str = "robots"
+    influxdb_url: str
+    influxdb_token: str
+    influxdb_org: str
+    influxdb_bucket: str
 
-    # Grafana (для создания учёток при регистрации)
-    grafana_url: str = "http://grafana:3000"
-    grafana_admin_user: str = "admin"
-    grafana_admin_password: str = "admin"
+    # Grafana
+    grafana_url: str
+    grafana_admin_user: str
+    grafana_admin_password: str
 
-    # Superset (для создания учёток при регистрации)
-    superset_url: str = "http://superset:8088"
-    superset_admin_username: str = "admin"
-    superset_admin_password: str = "admin"
+    # Superset
+    superset_url: str
+    superset_admin_username: str
+    superset_admin_password: str
+
+    # Администратор WolfpackCloud (создаётся при запуске)
+    default_admin_email: str
+    default_admin_password: str
+    default_admin_name: str
 
     @property
     def async_database_url(self) -> str:
