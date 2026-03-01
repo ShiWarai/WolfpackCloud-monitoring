@@ -138,7 +138,7 @@ async def test_metrics_no_auth_header(client: AsyncClient):
         },
     )
 
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.asyncio

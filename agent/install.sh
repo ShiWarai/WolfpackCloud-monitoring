@@ -89,8 +89,7 @@ detect_distro() {
 generate_pair_code() {
     local chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
     local code=""
-    local i
-    for i in $(seq 1 8); do
+    for _ in $(seq 1 8); do
         code="${code}${chars:$((RANDOM % ${#chars})):1}"
     done
     echo "$code"

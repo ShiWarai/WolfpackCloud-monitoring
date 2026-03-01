@@ -62,10 +62,9 @@ RUN useradd --create-home --shell /bin/bash appuser
 
 COPY app/ ./app/
 COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
 
-# Смена владельца
-RUN chown -R appuser:appuser /app
+# Права на entrypoint и смена владельца
+RUN chmod +x entrypoint.sh && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
