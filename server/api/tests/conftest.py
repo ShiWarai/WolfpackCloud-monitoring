@@ -5,7 +5,7 @@
 import asyncio
 import os
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -74,7 +74,7 @@ async def db_session(test_engine, setup_database) -> AsyncGenerator[AsyncSession
 
 def create_test_access_token(user_id: int) -> str:
     """Создаёт тестовый JWT access токен."""
-    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    expire = datetime.now(UTC) + timedelta(minutes=30)
     to_encode = {"sub": str(user_id), "exp": expire, "type": "access"}
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
@@ -102,7 +102,11 @@ async def admin_token(test_admin: User) -> str:
 
 
 @pytest.fixture
-async def client(db_session: AsyncSession, test_admin: User, admin_token: str) -> AsyncGenerator[AsyncClient, None]:  # noqa: ARG001
+async def client(
+    db_session: AsyncSession,
+    test_admin: User,  # noqa: ARG001
+    admin_token: str,
+) -> AsyncGenerator[AsyncClient, None]:
     """Асинхронный HTTP клиент с подменённой БД и авторизацией админа."""
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:

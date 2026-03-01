@@ -15,13 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import User, UserRole
-from app.services.external_auth import ExternalAuthService
+from app.models import User
 from app.schemas import (
     ErrorResponse,
     RefreshTokenRequest,
     TokenResponse,
-    UserCreate,
     UserLogin,
     UserResponse,
 )

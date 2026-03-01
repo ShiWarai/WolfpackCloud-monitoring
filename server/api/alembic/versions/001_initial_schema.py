@@ -70,7 +70,9 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            postgresql.ENUM("pending", "active", "inactive", "error", name="robot_status", create_type=False),
+            postgresql.ENUM(
+                "pending", "active", "inactive", "error", name="robot_status", create_type=False
+            ),
             nullable=False,
         ),
         sa.Column("influxdb_token", sa.Text(), nullable=True),
@@ -103,7 +105,9 @@ def upgrade() -> None:
         sa.Column("robot_id", sa.Integer(), nullable=False),
         sa.Column(
             "status",
-            postgresql.ENUM("pending", "confirmed", "expired", name="pair_code_status", create_type=False),
+            postgresql.ENUM(
+                "pending", "confirmed", "expired", name="pair_code_status", create_type=False
+            ),
             nullable=False,
         ),
         sa.Column(

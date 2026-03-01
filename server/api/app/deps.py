@@ -86,9 +86,7 @@ def get_optional_current_user():
     """Опциональная аутентификация - возвращает None если токен не передан."""
 
     async def _get_optional_user(
-        credentials: HTTPAuthorizationCredentials | None = Depends(
-            HTTPBearer(auto_error=False)
-        ),
+        credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
         db: AsyncSession = Depends(get_db),
     ) -> User | None:
         if credentials is None:

@@ -22,9 +22,7 @@ class ExternalAuthService:
     def __init__(self, settings: "Settings") -> None:
         self._settings = settings
 
-    async def create_grafana_user(
-        self, email: str, password: str, name: str
-    ) -> int | None:
+    async def create_grafana_user(self, email: str, password: str, name: str) -> int | None:
         """
         Создаёт пользователя в Grafana с ролью Editor.
 
@@ -74,9 +72,7 @@ class ExternalAuthService:
             logger.warning("Grafana request failed: %s", e)
             return None
 
-    async def _set_grafana_org_role(
-        self, user_id: int, role: str, auth: tuple[str, str]
-    ) -> bool:
+    async def _set_grafana_org_role(self, user_id: int, role: str, auth: tuple[str, str]) -> bool:
         """Устанавливает роль пользователя в организации (org 1)."""
         url = f"{self._settings.grafana_url.rstrip('/')}/api/orgs/1/users/{user_id}"
 
@@ -100,9 +96,7 @@ class ExternalAuthService:
             logger.warning("Grafana set role request failed: %s", e)
             return False
 
-    async def create_superset_user(
-        self, email: str, password: str, name: str
-    ) -> int | None:
+    async def create_superset_user(self, email: str, password: str, name: str) -> int | None:
         """
         Создаёт пользователя в Superset с ролью Gamma (Editor).
 

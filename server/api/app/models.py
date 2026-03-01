@@ -123,7 +123,9 @@ class PairCode(Base):
     code: Mapped[str] = mapped_column(String(8), unique=True, nullable=False, index=True)
     robot_id: Mapped[int] = mapped_column(ForeignKey("robots.id"), nullable=False)
     status: Mapped[PairCodeStatus] = mapped_column(
-        Enum(PairCodeStatus, name="pair_code_status", values_callable=lambda x: [e.value for e in x]),
+        Enum(
+            PairCodeStatus, name="pair_code_status", values_callable=lambda x: [e.value for e in x]
+        ),
         nullable=False,
         default=PairCodeStatus.PENDING,
     )
