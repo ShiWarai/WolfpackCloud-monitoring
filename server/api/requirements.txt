@@ -18,6 +18,7 @@ pydantic-settings>=2.6.0
 # Утилиты
 python-dotenv>=1.0.1
 httpx>=0.28.0
+apscheduler>=3.10.0
 
 # Аутентификация
 python-jose[cryptography]>=3.3.0
