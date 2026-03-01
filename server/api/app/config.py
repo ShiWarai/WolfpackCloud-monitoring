@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Безопасность
     secret_key: str = "dev-secret-key-change-in-production"
-    pair_code_expiration_minutes: int = 10
+    pair_code_expiration_minutes: int = 15
 
     # JWT
     jwt_secret_key: str = "dev-jwt-secret-key-change-in-production"
