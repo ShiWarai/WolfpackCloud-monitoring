@@ -61,15 +61,18 @@ async def setup_database(test_engine):
 
 @pytest.fixture
 async def db_session(test_engine, setup_database) -> AsyncGenerator[AsyncSession, None]:  # noqa: ARG001
-    """Сессия БД для каждого теста с откатом транзакции."""
-    async_session = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
-    async with async_session() as session:
-        yield session
-        await session.rollback()
+    """Сессия БД для каждого теста с откатом транзакции через SAVEPOINT."""
+    async with test_engine.connect() as conn:
+        trans = await conn.begin()
+        async_session = async_sessionmaker(
+            bind=conn,
+            class_=AsyncSession,
+            expire_on_commit=False,
+            join_transaction_mode="create_savepoint",
+        )
+        async with async_session() as session:
+            yield session
+        await trans.rollback()
 
 
 def create_test_access_token(user_id: int) -> str:
