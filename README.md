@@ -6,6 +6,8 @@
 
 Система мониторинга для роботов на одноплатных компьютерах (OrangePi5, Raspberry Pi). Сбор метрик, логов и визуализация в Grafana.
 
+<img width="2552" height="1352" alt="image" src="https://github.com/user-attachments/assets/b4381d02-a552-4268-b025-5cab83df45ff" />
+
 ## Быстрый старт
 
 **Сервер:**
