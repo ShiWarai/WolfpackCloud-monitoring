@@ -100,10 +100,20 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT }}
           script: |
-            cd ~/wolfpackcloud-monitoring
+            set -e
+            DEPLOY_DIR=~/wolfpackcloud-monitoring
+            REPO_URL="https://github.com/${{ github.repository }}.git"
 
-            # Бэкап текущей конфигурации
-            cp .env .env.backup.$(date +%Y%m%d%H%M%S)
+            # Первоначальная установка если директории нет
+            if [ ! -d "$DEPLOY_DIR" ]; then
+              echo "Директория не найдена, клонируем репозиторий..."
+              git clone "$REPO_URL" "$DEPLOY_DIR"
+              cd "$DEPLOY_DIR"
+              cp .env.example .env
+              echo "⚠️  Создан .env из примера. Настройте переменные перед следующим деплоем!"
+            else
+              cd "$DEPLOY_DIR"
+            fi
 
             # Обновление репозитория
             git fetch origin
@@ -117,13 +127,21 @@ jobs:
             docker compose up -d --remove-orphans
 
             # Проверка health (API на порту 9100)
-            sleep 30
+            echo "Ожидание запуска сервисов..."
+            for i in {1..12}; do
+              if curl -sf http://localhost:9100/health > /dev/null 2>&1; then
+                echo "✅ Health check passed"
+                break
+              fi
+              echo "Попытка $i/12..."
+              sleep 5
+            done
             curl -f http://localhost:9100/health || exit 1
 
             # Очистка старых образов
             docker image prune -f
 
-            echo "Production деплой завершён: ${{ needs.build-and-push.outputs.version }}"
+            echo "✅ Production деплой завершён: ${{ needs.build-and-push.outputs.version }}"
 
   # ==========================================================================
   # Уведомления
