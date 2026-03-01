@@ -9,10 +9,10 @@
 make dev
 
 # 2. Создание виртуального робота
-./scripts/local-install.sh --docker
+make agent
 ```
 
-`local-install.sh` создаёт виртуального робота (Telegraf в контейнере), который:
+`make agent` запускает тестового агента (Telegraf в контейнере), который:
 1. Регистрируется на сервере
 2. **Автоматически подтверждает привязку** (для удобства тестирования)
 3. Получает персональный токен
@@ -39,23 +39,20 @@ make dev
 2. В выпадающем списке выберите `local-test-robot`
 3. Метрики появятся через 10-30 секунд
 
-## Режимы установки
-
-### Docker (по умолчанию)
+## Управление тестовым агентом
 
 ```bash
-./scripts/local-install.sh --docker
+# Запуск агента
+make agent
+
+# Просмотр логов
+make agent-logs
+
+# Остановка агента
+make agent-stop
 ```
 
-Telegraf запускается в Docker контейнере, собирает метрики хоста.
-
-### Native
-
-```bash
-./scripts/local-install.sh --native
-```
-
-Telegraf устанавливается нативно на хост. Требует sudo.
+Агент запускается в Docker контейнере и собирает метрики хоста.
 
 ## Тестирование API
 
@@ -128,8 +125,8 @@ docker compose logs -f api
 docker compose logs -f grafana
 docker compose logs -f influxdb
 
-# Telegraf (локальный контейнер)
-docker logs -f wpc-telegraf-local
+# Telegraf (тестовый агент)
+make agent-logs
 ```
 
 ## База данных
@@ -143,7 +140,6 @@ docker compose exec postgres psql -U monitoring -d monitoring
 # Запросы
 SELECT * FROM robots;
 SELECT * FROM pair_codes;
-SELECT * FROM robots_view;
 ```
 
 ### InfluxDB
@@ -161,11 +157,14 @@ from(bucket: "robots")
 ## Удаление
 
 ```bash
-# Удаление со всеми данными
-./scripts/local-uninstall.sh
+# Остановить агента
+make agent-stop
 
-# Сохранение данных (volumes)
-./scripts/local-uninstall.sh --keep-data
+# Очистить данные (метрики и роботы)
+make clean-data
+
+# Полная остановка стека
+make down
 ```
 
 ## Troubleshooting
@@ -183,13 +182,16 @@ docker compose logs
 
 ```bash
 # Проверьте логи Telegraf
-docker logs wpc-telegraf-local
+make agent-logs
+
+# Или напрямую через Docker
+docker logs wpc-monitoring-agent
 
 # Проверьте конфигурацию
-docker exec wpc-telegraf-local cat /etc/telegraf/telegraf.conf
+docker exec wpc-monitoring-agent cat /etc/telegraf/telegraf.conf
 
 # Тест конфигурации
-docker exec wpc-telegraf-local telegraf --test
+docker exec wpc-monitoring-agent telegraf --test
 ```
 
 ### Нет данных в Grafana
